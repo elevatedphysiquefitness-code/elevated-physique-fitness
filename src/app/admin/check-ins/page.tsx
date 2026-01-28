@@ -42,7 +42,7 @@ export default function CheckInsPage() {
       .from('check_ins')
       .select(`
         *,
-        profiles (full_name, email)
+        profiles:client_id (full_name, email)
       `)
       .order('created_at', { ascending: false });
 

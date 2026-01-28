@@ -2,14 +2,18 @@ import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+function getAnthropicClient() {
+  return new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+  });
+}
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabaseClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 interface FoodRequest {
   goal: string;
@@ -79,6 +83,7 @@ export async function POST(request: Request) {
     }
 
     // Fetch available foods from database for reference
+    const supabase = getSupabaseClient();
     const { data: foods } = await supabase
       .from('foods')
       .select('*')
@@ -88,6 +93,7 @@ export async function POST(request: Request) {
     const prompt = buildFoodPrompt(body, foods || []);
 
     // Call Claude API
+    const anthropic = getAnthropicClient();
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 2048,

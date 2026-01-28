@@ -103,10 +103,18 @@ export default function RegisterPage() {
         workout_days_per_week: parseInt(formData.workoutDays),
         availability: formData.availability,
         goals: formData.goals,
+        onboarding_completed: false,
       });
 
       if (detailsError) {
         console.error('Client details error:', detailsError);
+      }
+
+      // If the session is already available (e.g., email confirmation disabled),
+      // redirect to onboarding immediately
+      if (data.session) {
+        router.push('/dashboard/onboarding');
+        return;
       }
     }
 

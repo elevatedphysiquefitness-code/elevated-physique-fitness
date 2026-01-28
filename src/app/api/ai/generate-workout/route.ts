@@ -2,14 +2,18 @@ import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+function getAnthropicClient() {
+  return new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+  });
+}
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabaseClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 interface WorkoutRequest {
   fitnessGoals: string[];
@@ -98,6 +102,7 @@ export async function POST(request: Request) {
     const prompt = buildWorkoutPrompt(body);
 
     // Call Claude API
+    const anthropic = getAnthropicClient();
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 4096,
@@ -245,6 +250,7 @@ async function saveGeneratedProgram(
   requestData: WorkoutRequest
 ) {
   // Create the workout program
+  const supabase = getSupabaseClient();
   const { data: programData, error: programError } = await supabase
     .from('workout_programs')
     .insert({

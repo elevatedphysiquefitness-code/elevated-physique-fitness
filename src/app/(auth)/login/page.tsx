@@ -25,7 +25,7 @@ function LoginForm() {
 
     const supabase = createClient();
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -34,6 +34,34 @@ function LoginForm() {
       setError(error.message);
       setLoading(false);
       return;
+    }
+
+    // Check user role and onboarding status to decide where to redirect
+    if (data.user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single();
+
+      if (profile?.role === 'admin') {
+        router.push('/admin');
+        router.refresh();
+        return;
+      }
+
+      // Check if client has completed onboarding
+      const { data: details } = await supabase
+        .from('client_details')
+        .select('onboarding_completed')
+        .eq('user_id', data.user.id)
+        .single();
+
+      if (details && !details.onboarding_completed) {
+        router.push('/dashboard/onboarding');
+        router.refresh();
+        return;
+      }
     }
 
     router.push(redirect);
