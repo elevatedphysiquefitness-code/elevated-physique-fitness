@@ -222,12 +222,29 @@ export default function NutritionPage() {
   const [loadingMeals, setLoadingMeals] = useState(false);
   const [expandedMeal, setExpandedMeal] = useState<number | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showMealOptionsModal, setShowMealOptionsModal] = useState(false);
   const [tempSettings, setTempSettings] = useState({
     weight: '',
     bodyFatPercentage: '',
     goal: 'maintenance',
     activityLevel: 'moderate',
   });
+  const [mealOptions, setMealOptions] = useState({
+    mealType: 'all' as 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'all',
+    numberOfMeals: 4,
+    dietaryPreferences: [] as string[],
+  });
+
+  const dietaryOptions = [
+    { value: 'vegetarian', label: 'Vegetarian' },
+    { value: 'vegan', label: 'Vegan' },
+    { value: 'low-carb', label: 'Low Carb' },
+    { value: 'high-protein', label: 'High Protein' },
+    { value: 'gluten-free', label: 'Gluten Free' },
+    { value: 'dairy-free', label: 'Dairy Free' },
+    { value: 'keto', label: 'Keto' },
+    { value: 'paleo', label: 'Paleo' },
+  ];
 
   useEffect(() => {
     fetchClientData();
@@ -301,9 +318,10 @@ export default function NutritionPage() {
     setShowSettingsModal(false);
   };
 
-  const fetchMealSuggestions = async (mealType: string = 'all') => {
+  const fetchMealSuggestions = async () => {
     if (!macros || !clientData.goal) return;
     setLoadingMeals(true);
+    setShowMealOptionsModal(false);
     try {
       const res = await fetch('/api/ai/food-recommendations', {
         method: 'POST',
@@ -314,7 +332,9 @@ export default function NutritionPage() {
           targetProtein: macros.protein,
           targetCarbs: macros.carbs,
           targetFat: macros.fats,
-          mealType,
+          mealType: mealOptions.mealType,
+          numberOfMeals: mealOptions.numberOfMeals,
+          dietaryPreferences: mealOptions.dietaryPreferences,
         }),
       });
       const data = await res.json();
@@ -325,6 +345,15 @@ export default function NutritionPage() {
       console.error('Error fetching meal suggestions:', err);
     }
     setLoadingMeals(false);
+  };
+
+  const toggleDietaryPreference = (value: string) => {
+    setMealOptions(prev => ({
+      ...prev,
+      dietaryPreferences: prev.dietaryPreferences.includes(value)
+        ? prev.dietaryPreferences.filter(p => p !== value)
+        : [...prev.dietaryPreferences, value],
+    }));
   };
 
   if (loading) {
@@ -484,26 +513,55 @@ export default function NutritionPage() {
                   <p className="text-sm text-grey-500">Personalized meals based on your macro targets</p>
                 </div>
               </div>
-              <Button
-                onClick={() => fetchMealSuggestions()}
-                variant="outline"
-                disabled={loadingMeals}
-              >
-                {loadingMeals ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                ) : mealSuggestions.length > 0 ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Refresh
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Get Suggestions
-                  </>
-                )}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => setShowMealOptionsModal(true)}
+                  variant="outline"
+                  disabled={loadingMeals}
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Options
+                </Button>
+                <Button
+                  onClick={() => fetchMealSuggestions()}
+                  variant="primary"
+                  disabled={loadingMeals}
+                >
+                  {loadingMeals ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : mealSuggestions.length > 0 ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Generate
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
+
+            {/* Current Options Display */}
+            {(mealOptions.mealType !== 'all' || mealOptions.dietaryPreferences.length > 0) && (
+              <div className="mb-4 flex flex-wrap gap-2">
+                {mealOptions.mealType !== 'all' && (
+                  <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 capitalize">
+                    {mealOptions.mealType} only
+                  </span>
+                )}
+                {mealOptions.dietaryPreferences.map(pref => (
+                  <span key={pref} className="text-xs bg-green-100 text-green-700 px-2 py-1 capitalize">
+                    {pref.replace('-', ' ')}
+                  </span>
+                ))}
+                <span className="text-xs bg-grey-100 text-grey-600 px-2 py-1">
+                  {mealOptions.numberOfMeals} meals
+                </span>
+              </div>
+            )}
 
             {loadingMeals && (
               <div className="flex items-center justify-center py-12">
@@ -762,6 +820,118 @@ export default function NutritionPage() {
                   disabled={!tempSettings.weight}
                 >
                   Calculate
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Meal Options Modal */}
+      {showMealOptionsModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-black">Meal Suggestion Options</h3>
+                <button
+                  onClick={() => setShowMealOptionsModal(false)}
+                  className="text-grey-400 hover:text-black"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Meal Type */}
+                <div>
+                  <label className="block text-sm font-medium text-black mb-2">
+                    Meal Type
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {['all', 'breakfast', 'lunch', 'dinner', 'snack'].map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => setMealOptions(prev => ({ ...prev, mealType: type as any }))}
+                        className={`px-3 py-2 text-sm font-medium capitalize transition-colors ${
+                          mealOptions.mealType === type
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-grey-100 text-grey-700 hover:bg-grey-200'
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Number of Meals */}
+                <div>
+                  <label className="block text-sm font-medium text-black mb-2">
+                    Number of Suggestions: {mealOptions.numberOfMeals}
+                  </label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="8"
+                    value={mealOptions.numberOfMeals}
+                    onChange={(e) => setMealOptions(prev => ({ ...prev, numberOfMeals: parseInt(e.target.value) }))}
+                    className="w-full h-2 bg-grey-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <div className="flex justify-between text-xs text-grey-500 mt-1">
+                    <span>1</span>
+                    <span>4</span>
+                    <span>8</span>
+                  </div>
+                </div>
+
+                {/* Dietary Preferences */}
+                <div>
+                  <label className="block text-sm font-medium text-black mb-2">
+                    Dietary Preferences
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {dietaryOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => toggleDietaryPreference(option.value)}
+                        className={`px-3 py-2 text-sm font-medium text-left transition-colors ${
+                          mealOptions.dietaryPreferences.includes(option.value)
+                            ? 'bg-green-600 text-white'
+                            : 'bg-grey-100 text-grey-700 hover:bg-grey-200'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-grey-500">
+                    Select any dietary restrictions or preferences
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <Button
+                  onClick={() => {
+                    setMealOptions({
+                      mealType: 'all',
+                      numberOfMeals: 4,
+                      dietaryPreferences: [],
+                    });
+                  }}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Reset
+                </Button>
+                <Button
+                  onClick={() => fetchMealSuggestions()}
+                  variant="primary"
+                  className="flex-1"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate Meals
                 </Button>
               </div>
             </div>

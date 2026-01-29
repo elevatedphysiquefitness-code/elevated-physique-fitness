@@ -257,6 +257,7 @@ export default function MessagesPage() {
 
       if (error) {
         console.error('Error sending message:', error);
+        alert('Failed to send message. Please try again.');
       } else if (data) {
         setMessages((prev) => {
           if (prev.some(m => m.id === data.id)) return prev;

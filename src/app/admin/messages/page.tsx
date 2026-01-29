@@ -140,7 +140,10 @@ export default function AdminMessagesPage() {
       .select()
       .single();
 
-    if (data && !error) {
+    if (error) {
+      alert('Failed to send message. Please try again.');
+      console.error('Error sending message:', error);
+    } else if (data) {
       setMessages([...messages, data]);
       setNewMessage('');
     }

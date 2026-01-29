@@ -114,10 +114,18 @@ export default function AdminExercisesPage() {
       secondary_muscles: form.secondary_muscles ? form.secondary_muscles.split(',').map(s => s.trim()).filter(Boolean) : null,
     };
 
+    let error;
     if (editingId) {
-      await supabase.from('exercises').update(payload).eq('id', editingId);
+      ({ error } = await supabase.from('exercises').update(payload).eq('id', editingId));
     } else {
-      await supabase.from('exercises').insert(payload);
+      ({ error } = await supabase.from('exercises').insert(payload));
+    }
+
+    if (error) {
+      alert('Failed to save exercise. Please try again.');
+      console.error('Error saving exercise:', error);
+      setSaving(false);
+      return;
     }
 
     setShowModal(false);
@@ -128,7 +136,12 @@ export default function AdminExercisesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this exercise? This cannot be undone.')) return;
     const supabase = createClient();
-    await supabase.from('exercises').delete().eq('id', id);
+    const { error } = await supabase.from('exercises').delete().eq('id', id);
+    if (error) {
+      alert('Failed to delete exercise.');
+      console.error('Error deleting exercise:', error);
+      return;
+    }
     setExercises(exercises.filter(e => e.id !== id));
   };
 

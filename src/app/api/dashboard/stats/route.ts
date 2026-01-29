@@ -22,29 +22,20 @@ export async function GET(request: Request) {
 
     const supabase = getSupabaseClient();
 
-    // Try to use the database function first
-    const { data: statsFromFunction, error: fnError } = await supabase
-      .rpc('get_client_stats', { p_client_id: clientId });
-
-    if (!fnError && statsFromFunction) {
-      return NextResponse.json(statsFromFunction);
-    }
-
-    // Fallback: Query each table individually
+    // Query each table individually
     const [
-      sessionsResult,
+      workoutsResult,
       checkInsResult,
       photosResult,
       habitsResult,
-      notesResult,
       messagesResult,
       programResult,
       todayHabitsResult,
       totalHabitsResult,
     ] = await Promise.all([
-      // Total completed sessions
+      // Total completed workouts (using assigned_workouts table)
       supabase
-        .from('sessions')
+        .from('assigned_workouts')
         .select('*', { count: 'exact', head: true })
         .eq('client_id', clientId)
         .eq('status', 'completed'),
@@ -67,12 +58,6 @@ export async function GET(request: Request) {
         .select('*', { count: 'exact', head: true })
         .eq('client_id', clientId)
         .eq('completed', true),
-
-      // Total notes
-      supabase
-        .from('notes')
-        .select('*', { count: 'exact', head: true })
-        .eq('client_id', clientId),
 
       // Unread messages
       supabase
@@ -105,27 +90,27 @@ export async function GET(request: Request) {
         .eq('is_active', true),
     ]);
 
-    // Calculate sessions this week
+    // Calculate workouts this week
     const startOfWeek = getStartOfWeek();
-    const { count: sessionsThisWeek } = await supabase
-      .from('sessions')
+    const { count: workoutsThisWeek } = await supabase
+      .from('assigned_workouts')
       .select('*', { count: 'exact', head: true })
       .eq('client_id', clientId)
       .eq('status', 'completed')
-      .gte('session_date', startOfWeek);
+      .gte('workout_date', startOfWeek);
 
     const stats = {
-      total_sessions_completed: sessionsResult.count || 0,
+      total_sessions_completed: workoutsResult.count || 0,
       total_check_ins: checkInsResult.count || 0,
       total_progress_photos: photosResult.count || 0,
       total_habits_completed: habitsResult.count || 0,
-      total_notes: notesResult.count || 0,
+      total_notes: 0,
       unread_messages: messagesResult.count || 0,
       current_week: programResult.data?.current_week || 1,
-      sessions_this_week: sessionsThisWeek || 0,
+      sessions_this_week: workoutsThisWeek || 0,
       habits_today: todayHabitsResult.count || 0,
       total_habits_today: totalHabitsResult.count || 0,
-      habit_streak: 0, // Calculate separately if needed
+      habit_streak: 0,
     };
 
     return NextResponse.json(stats);

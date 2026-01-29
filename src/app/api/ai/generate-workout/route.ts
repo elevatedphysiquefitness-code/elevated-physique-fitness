@@ -69,9 +69,14 @@ export async function POST(request: Request) {
             const cookies: { name: string; value: string }[] = [];
             if (cookieHeader) {
               cookieHeader.split(';').forEach(cookie => {
-                const [name, value] = cookie.trim().split('=');
-                if (name && value) {
-                  cookies.push({ name, value });
+                const trimmed = cookie.trim();
+                const idx = trimmed.indexOf('=');
+                if (idx > 0) {
+                  const name = trimmed.substring(0, idx);
+                  const value = trimmed.substring(idx + 1);
+                  if (name && value) {
+                    cookies.push({ name, value });
+                  }
                 }
               });
             }
@@ -134,8 +139,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, program: generatedProgram });
   } catch (error) {
     console.error('Error generating workout:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { success: false, error: 'Failed to generate workout program' },
+      { success: false, error: `Failed to generate workout program: ${errorMessage}` },
       { status: 500 }
     );
   }

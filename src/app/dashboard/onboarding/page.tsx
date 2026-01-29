@@ -217,6 +217,7 @@ export default function OnboardingPage() {
 
     if (error) {
       console.error('Error saving onboarding:', error);
+      alert('Failed to save your preferences. Please try again.');
       return false;
     }
 

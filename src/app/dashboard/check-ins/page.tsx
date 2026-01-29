@@ -124,7 +124,7 @@ export default function CheckInsPage() {
           client_id: user.id,
           week_number: currentWeek,
           weight: parseFloat(currentWeight),
-          sleep_quality: sleepQuality,
+          sleep_quality: sleepQuality.toLowerCase(),
           energy_level: parseInt(energyLevel),
           adherence: adherence,
           notes: notes || null,

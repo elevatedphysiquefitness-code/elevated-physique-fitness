@@ -127,7 +127,10 @@ export default function ProgressPage() {
         notes: newMeasurement.notes || null,
       });
 
-    if (!error) {
+    if (error) {
+      alert('Failed to save measurement. Please try again.');
+      console.error('Error saving measurement:', error);
+    } else {
       setNewMeasurement({
         weight: '',
         bodyFatPercentage: '',
@@ -178,7 +181,10 @@ export default function ProgressPage() {
         photo_date: new Date().toISOString().split('T')[0],
       });
 
-    if (!error) {
+    if (error) {
+      alert('Failed to save photo record. Please try again.');
+      console.error('Error saving photo:', error);
+    } else {
       setShowPhotoModal(false);
       fetchProgress();
     }

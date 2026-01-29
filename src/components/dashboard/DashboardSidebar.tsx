@@ -111,7 +111,7 @@ export default function DashboardSidebar({ isOpen, onClose }: DashboardSidebarPr
           {/* Footer */}
           <div className="border-t border-grey-800 p-3 space-y-1">
             <Link
-              href="/dashboard/settings"
+              href="/dashboard/onboarding"
               className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-grey-400 hover:bg-grey-800 hover:text-white transition-colors"
             >
               <Settings className="h-5 w-5" />

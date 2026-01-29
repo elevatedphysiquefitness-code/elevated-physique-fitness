@@ -23,6 +23,7 @@ interface FoodRequest {
   targetFat: number;
   dietaryPreferences?: string[];
   mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'all';
+  numberOfMeals?: number;
 }
 
 interface MealSuggestion {
@@ -53,9 +54,14 @@ export async function POST(request: Request) {
             const cookies: { name: string; value: string }[] = [];
             if (cookieHeader) {
               cookieHeader.split(';').forEach(cookie => {
-                const [name, value] = cookie.trim().split('=');
-                if (name && value) {
-                  cookies.push({ name, value });
+                const trimmed = cookie.trim();
+                const idx = trimmed.indexOf('=');
+                if (idx > 0) {
+                  const name = trimmed.substring(0, idx);
+                  const value = trimmed.substring(idx + 1);
+                  if (name && value) {
+                    cookies.push({ name, value });
+                  }
                 }
               });
             }
@@ -148,9 +154,16 @@ function buildFoodPrompt(data: FoodRequest, foods: any[]): string {
     ? `\n\nAvailable foods in our database for reference:\n${foods.map(f => `- ${f.name}: ${f.calories_per_serving} cal, ${f.protein_per_serving}g protein (${f.serving_size})`).join('\n')}`
     : '';
 
-  const mealTypeInstruction = data.mealType && data.mealType !== 'all'
-    ? `Generate 3 ${data.mealType} suggestions.`
-    : 'Generate 1 breakfast, 1 lunch, 1 dinner, and 1 snack suggestion.';
+  const numberOfMeals = data.numberOfMeals || 4;
+  let mealTypeInstruction: string;
+
+  if (data.mealType && data.mealType !== 'all') {
+    mealTypeInstruction = `Generate ${numberOfMeals} ${data.mealType} suggestions.`;
+  } else if (numberOfMeals <= 4) {
+    mealTypeInstruction = `Generate ${numberOfMeals} meal suggestions with a good variety (e.g., breakfast, lunch, dinner, snack).`;
+  } else {
+    mealTypeInstruction = `Generate ${numberOfMeals} meal suggestions with variety across breakfast, lunch, dinner, and snacks.`;
+  }
 
   return `You are a nutrition expert helping a fitness client with meal recommendations.
 

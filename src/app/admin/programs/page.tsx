@@ -70,7 +70,10 @@ export default function ProgramsPage() {
       .select()
       .single();
 
-    if (data && !error) {
+    if (error) {
+      alert('Failed to create program. Please try again.');
+      console.error('Error creating program:', error);
+    } else if (data) {
       setPrograms([{ ...data, client_count: 0 }, ...programs]);
       setNewProgram({ title: '', description: '', duration_weeks: 12 });
       setShowCreateModal(false);
@@ -83,7 +86,12 @@ export default function ProgramsPage() {
     if (!confirm('Are you sure you want to delete this program?')) return;
 
     const supabase = createClient();
-    await supabase.from('workout_programs').delete().eq('id', id);
+    const { error } = await supabase.from('workout_programs').delete().eq('id', id);
+    if (error) {
+      alert('Failed to delete program.');
+      console.error('Error deleting program:', error);
+      return;
+    }
     setPrograms(programs.filter((p) => p.id !== id));
   };
 

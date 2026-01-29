@@ -25,7 +25,7 @@ const navigation = [
 ];
 
 const secondaryNavigation = [
-  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { name: 'Settings', href: '/dashboard/onboarding', icon: Settings },
   { name: 'Sign Out', href: '/', icon: LogOut },
 ];
 

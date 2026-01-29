@@ -159,7 +159,7 @@ export default function HabitsPage() {
     setTodayLogs({ ...todayLogs, [habitId]: newValue });
 
     // Upsert habit log
-    await supabase.from('habit_logs').upsert({
+    const { error } = await supabase.from('habit_logs').upsert({
       habit_id: habitId,
       client_id: user.id,
       log_date: today,
@@ -167,6 +167,12 @@ export default function HabitsPage() {
     }, {
       onConflict: 'habit_id,log_date'
     });
+
+    if (error) {
+      // Revert optimistic update
+      setTodayLogs({ ...todayLogs, [habitId]: !newValue });
+      console.error('Error toggling habit:', error);
+    }
 
     // Recalculate stats after toggle
     const calculatedStreak = await calculateStreak(supabase, user.id, habits.length);
@@ -194,7 +200,10 @@ export default function HabitsPage() {
       .select()
       .single();
 
-    if (data && !error) {
+    if (error) {
+      alert('Failed to add habit. Please try again.');
+      console.error('Error adding habit:', error);
+    } else if (data) {
       setHabits([...habits, data]);
       setNewHabitName('');
       setNewHabitDescription('');
@@ -220,7 +229,10 @@ export default function HabitsPage() {
       .insert(habitsToInsert)
       .select();
 
-    if (data && !error) {
+    if (error) {
+      alert('Failed to add default habits. Please try again.');
+      console.error('Error adding default habits:', error);
+    } else if (data) {
       setHabits(data);
     }
   };

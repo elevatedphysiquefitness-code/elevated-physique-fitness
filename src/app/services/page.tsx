@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
-import SectionHeading from '@/components/ui/SectionHeading';
 import Button from '@/components/ui/Button';
 import { Users, Laptop, ArrowRight, Check } from 'lucide-react';
+import AdminImageUpload from '@/components/admin/AdminImageUpload';
 
 export const metadata: Metadata = {
   title: 'Services | Elevated Physique Fitness',
@@ -12,6 +12,7 @@ const services = [
   {
     icon: Users,
     title: '1-on-1 Personal Training',
+    imageKey: 'services-inperson',
     description: 'Private gym sessions tailored to your goals, experience level, and schedule.',
     features: [
       'Private training at a dedicated gym facility',
@@ -28,6 +29,7 @@ const services = [
   {
     icon: Laptop,
     title: 'Online Coaching',
+    imageKey: 'services-online',
     description: 'Remote programming, weekly check-ins, and habit coaching for clients who train on their own.',
     features: [
       'Fully customized training program',
@@ -47,16 +49,16 @@ export default function ServicesPage() {
   return (
     <>
       {/* Hero Section */}
-      <section className="py-24 bg-black text-white">
+      <section className="py-24 bg-brown-900 text-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
-            <p className="text-blue-500 text-sm font-semibold uppercase tracking-widest mb-6">
+            <p className="text-brown-300 text-sm font-semibold uppercase tracking-widest mb-6">
               Services
             </p>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight">
               Coaching That Fits Your Life
             </h1>
-            <p className="mt-8 text-xl text-grey-300 leading-relaxed">
+            <p className="mt-8 text-xl text-brown-200 leading-relaxed">
               Whether you train in-person in Houston or remotely from anywhere, we have a
               program designed to help you build the physique and discipline you deserve.
             </p>
@@ -67,7 +69,7 @@ export default function ServicesPage() {
       {/* Services Section */}
       <section className="py-24 bg-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="space-y-16">
+          <div className="space-y-24">
             {services.map((service, index) => (
               <div
                 key={service.title}
@@ -76,17 +78,17 @@ export default function ServicesPage() {
                 }`}
               >
                 <div className={index % 2 === 1 ? 'lg:order-2' : ''}>
-                  <div className="w-16 h-16 bg-blue-600 flex items-center justify-center mb-6">
+                  <div className="w-16 h-16 bg-brown-700 flex items-center justify-center mb-6">
                     <service.icon className="h-8 w-8 text-white" />
                   </div>
-                  <h2 className="text-3xl font-bold text-black">{service.title}</h2>
-                  <p className="mt-4 text-grey-600 text-lg">{service.description}</p>
+                  <h2 className="text-3xl font-bold text-brown-900">{service.title}</h2>
+                  <p className="mt-4 text-brown-600 text-lg">{service.description}</p>
 
                   <ul className="mt-8 space-y-4">
                     {service.features.map((feature) => (
                       <li key={feature} className="flex items-start gap-3">
-                        <Check className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                        <span className="text-grey-700">{feature}</span>
+                        <Check className="h-5 w-5 text-brown-700 flex-shrink-0 mt-0.5" />
+                        <span className="text-brown-700">{feature}</span>
                       </li>
                     ))}
                   </ul>
@@ -99,15 +101,21 @@ export default function ServicesPage() {
                   </div>
                 </div>
 
-                <div className={`bg-gradient-to-br from-grey-100 to-grey-200 aspect-[4/3] flex items-center justify-center ${
-                  index % 2 === 1 ? 'lg:order-1' : ''
-                }`}>
-                  <div className="text-center">
-                    <div className="w-20 h-20 mx-auto bg-blue-600 flex items-center justify-center">
-                      <service.icon className="h-10 w-10 text-white" />
-                    </div>
-                    <p className="mt-4 text-grey-600 font-semibold">{service.title}</p>
-                  </div>
+                <div className={`${index % 2 === 1 ? 'lg:order-1' : ''}`}>
+                  <AdminImageUpload
+                    imageKey={service.imageKey}
+                    className="w-full"
+                    aspectRatio="aspect-[4/3]"
+                    alt={service.title}
+                    placeholder={
+                      <div className="text-center">
+                        <div className="w-20 h-20 mx-auto bg-brown-600 flex items-center justify-center">
+                          <service.icon className="h-10 w-10 text-white" />
+                        </div>
+                        <p className="mt-4 text-brown-600 font-semibold">{service.title}</p>
+                      </div>
+                    }
+                  />
                 </div>
               </div>
             ))}
@@ -116,12 +124,12 @@ export default function ServicesPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-24 bg-blue-600">
+      <section className="py-24 bg-brown-700">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl sm:text-4xl font-bold text-white">
             Not Sure Which Service Is Right for You?
           </h2>
-          <p className="mt-6 text-blue-100 max-w-2xl mx-auto">
+          <p className="mt-6 text-brown-200 max-w-2xl mx-auto">
             Apply today and we&apos;ll help you find the perfect program based on your goals,
             schedule, and experience level.
           </p>
@@ -129,7 +137,7 @@ export default function ServicesPage() {
             <Button
               href="/apply"
               size="lg"
-              className="bg-white text-blue-600 hover:bg-grey-100"
+              className="bg-white text-brown-700 hover:bg-brown-100"
             >
               Apply for Coaching
               <ArrowRight className="ml-2 h-5 w-5" />
@@ -138,7 +146,7 @@ export default function ServicesPage() {
               href="/pricing"
               size="lg"
               variant="outline"
-              className="border-white text-white hover:bg-white hover:text-blue-600"
+              className="border-white text-white hover:bg-white hover:text-brown-700"
             >
               View All Pricing
             </Button>

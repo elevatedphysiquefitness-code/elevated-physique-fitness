@@ -25,6 +25,7 @@ interface Client {
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
@@ -35,39 +36,83 @@ export default function ClientsPage() {
   const fetchClients = async () => {
     const supabase = createClient();
 
-    const { data } = await supabase
+    // First fetch profiles without complex joins to avoid FK ambiguity
+    const { data: profilesData, error: profilesError } = await supabase
       .from('profiles')
-      .select(`
-        id,
-        full_name,
-        email,
-        phone,
-        created_at,
-        subscriptions (plan_name, status),
-        client_programs (
-          current_week,
-          workout_programs (title)
-        )
-      `)
+      .select('id, full_name, email, phone, created_at')
       .eq('role', 'client')
       .order('created_at', { ascending: false });
 
-    if (data) {
-      const formattedClients = data.map((client: any) => ({
-        id: client.id,
-        full_name: client.full_name,
-        email: client.email,
-        phone: client.phone,
-        created_at: client.created_at,
-        subscription: client.subscriptions?.[0],
-        program: client.client_programs?.[0] ? {
-          title: client.client_programs[0].workout_programs?.title,
-          current_week: client.client_programs[0].current_week,
-        } : undefined,
-      }));
-      setClients(formattedClients);
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError);
+      setError(`Failed to fetch clients: ${profilesError.message}`);
+      setLoading(false);
+      return;
     }
 
+    if (!profilesData || profilesData.length === 0) {
+      setClients([]);
+      setLoading(false);
+      return;
+    }
+
+    // Fetch subscriptions and programs separately to avoid FK ambiguity
+    const clientIds = profilesData.map(p => p.id);
+
+    const [subsResult, programsResult] = await Promise.all([
+      supabase
+        .from('subscriptions')
+        .select('client_id, plan_name, status')
+        .in('client_id', clientIds),
+      supabase
+        .from('client_programs')
+        .select('client_id, program_name, current_week, status')
+        .in('client_id', clientIds)
+    ]);
+
+    // Create lookup maps
+    const subscriptionMap = new Map();
+    if (subsResult.data) {
+      subsResult.data.forEach((sub: any) => {
+        if (!subscriptionMap.has(sub.client_id)) {
+          subscriptionMap.set(sub.client_id, sub);
+        }
+      });
+    }
+
+    const programMap = new Map();
+    if (programsResult.data) {
+      programsResult.data.forEach((prog: any) => {
+        // Prefer active programs
+        const existing = programMap.get(prog.client_id);
+        if (!existing || prog.status === 'active') {
+          programMap.set(prog.client_id, prog);
+        }
+      });
+    }
+
+    // Combine and format the data
+    const formattedClients = profilesData.map(profile => {
+      const subscription = subscriptionMap.get(profile.id);
+      const program = programMap.get(profile.id);
+      return {
+        id: profile.id,
+        full_name: profile.full_name,
+        email: profile.email,
+        phone: profile.phone,
+        created_at: profile.created_at,
+        subscription: subscription ? {
+          plan_name: subscription.plan_name,
+          status: subscription.status,
+        } : undefined,
+        program: program ? {
+          title: program.program_name,
+          current_week: program.current_week,
+        } : undefined,
+      };
+    });
+
+    setClients(formattedClients);
     setLoading(false);
   };
 
@@ -94,6 +139,23 @@ export default function ClientsPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-pulse text-grey-500">Loading...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 p-4 mb-4">
+          <h2 className="font-bold text-red-800">Error Loading Clients</h2>
+          <p className="text-red-700 mt-1">{error}</p>
+          <p className="text-red-600 text-sm mt-2">
+            This may be an RLS policy issue. Check that admin policies are set up correctly in Supabase.
+          </p>
+        </div>
+        <Button onClick={() => { setError(null); setLoading(true); fetchClients(); }} variant="outline">
+          Try Again
+        </Button>
       </div>
     );
   }

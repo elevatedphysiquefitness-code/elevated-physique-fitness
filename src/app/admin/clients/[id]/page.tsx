@@ -18,6 +18,10 @@ import {
   MessageSquare,
   X,
   Save,
+  Plus,
+  Trash2,
+  Clock,
+  GripVertical,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -56,6 +60,32 @@ interface WorkoutProgram {
   duration_weeks: number;
 }
 
+interface Exercise {
+  id: string;
+  name: string;
+  muscle_group: string;
+}
+
+interface CustomExercise {
+  exerciseId: string;
+  exerciseName: string;
+  sets: number;
+  reps: string;
+  restSeconds: number;
+  notes: string;
+}
+
+interface AssignedWorkout {
+  id: string;
+  workout_date: string;
+  status: string;
+  template: {
+    id: string;
+    name: string;
+    focus: string;
+  } | null;
+}
+
 interface Measurement {
   measurement_date: string;
   weight: number | null;
@@ -77,6 +107,20 @@ export default function ClientDetailPage() {
   const [selectedProgramId, setSelectedProgramId] = useState('');
   const [assignmentNotes, setAssignmentNotes] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Custom workout builder state
+  const [showCustomWorkoutModal, setShowCustomWorkoutModal] = useState(false);
+  const [allExercises, setAllExercises] = useState<Exercise[]>([]);
+  const [assignedWorkouts, setAssignedWorkouts] = useState<AssignedWorkout[]>([]);
+  const [customWorkout, setCustomWorkout] = useState({
+    name: '',
+    focus: '',
+    durationMinutes: 45,
+    workoutDate: new Date().toISOString().split('T')[0],
+    exercises: [] as CustomExercise[],
+  });
+  const [selectedExerciseId, setSelectedExerciseId] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetchClientData();
@@ -125,6 +169,36 @@ export default function ClientDetailPage() {
       .order('title');
     if (allProgramData) setAllPrograms(allProgramData);
 
+    // Fetch all exercises for custom workout builder
+    const { data: exerciseData } = await supabase
+      .from('exercises')
+      .select('id, name, muscle_group')
+      .order('name');
+    if (exerciseData) setAllExercises(exerciseData);
+
+    // Fetch assigned workouts for this client
+    const { data: assignedData } = await supabase
+      .from('assigned_workouts')
+      .select(`
+        id,
+        workout_date,
+        status,
+        template:workout_templates (id, title, name, focus)
+      `)
+      .eq('client_id', clientId)
+      .gte('workout_date', new Date().toISOString().split('T')[0])
+      .order('workout_date', { ascending: true })
+      .limit(14);
+    if (assignedData) {
+      setAssignedWorkouts(assignedData.map((w: any) => {
+        const t = w.template?.[0] || null;
+        return {
+          ...w,
+          template: t ? { ...t, name: t.name || t.title } : null
+        };
+      }));
+    }
+
     setLoading(false);
   };
 
@@ -160,11 +234,204 @@ export default function ClientDetailPage() {
         is_custom: false,
       });
 
-    if (!error) {
+    if (error) {
+      alert('Failed to assign program. Please try again.');
+      console.error('Error assigning program:', error);
+    } else {
+      // Create assigned_workouts for the first week so they show on calendar
+      const { data: templates } = await supabase
+        .from('workout_templates')
+        .select('id')
+        .or(`created_by.eq.${user?.id},created_for_client_id.eq.${clientId}`)
+        .limit(selectedProgram?.duration_weeks ? Math.min(7, selectedProgram.duration_weeks) : 5);
+
+      if (templates && templates.length > 0) {
+        const startDate = new Date();
+        const dayOfWeek = startDate.getDay();
+        const mondayOffset = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
+        const nextMonday = new Date(startDate);
+        nextMonday.setDate(startDate.getDate() + mondayOffset);
+
+        const assignedWorkouts = templates.map((template, i) => {
+          const workoutDate = new Date(nextMonday);
+          workoutDate.setDate(nextMonday.getDate() + i);
+          return {
+            client_id: clientId,
+            template_id: template.id,
+            workout_date: workoutDate.toISOString().split('T')[0],
+            status: 'scheduled',
+          };
+        });
+
+        await supabase.from('assigned_workouts').insert(assignedWorkouts);
+      }
+
       setShowAssignModal(false);
       setSelectedProgramId('');
       setAssignmentNotes('');
       fetchClientData();
+    }
+
+    setSaving(false);
+  };
+
+  const addExerciseToWorkout = () => {
+    if (!selectedExerciseId) return;
+    const exercise = allExercises.find(e => e.id === selectedExerciseId);
+    if (!exercise) return;
+
+    setCustomWorkout(prev => ({
+      ...prev,
+      exercises: [
+        ...prev.exercises,
+        {
+          exerciseId: exercise.id,
+          exerciseName: exercise.name,
+          sets: 3,
+          reps: '10',
+          restSeconds: 60,
+          notes: '',
+        },
+      ],
+    }));
+    setSelectedExerciseId('');
+  };
+
+  const removeExerciseFromWorkout = (index: number) => {
+    setCustomWorkout(prev => ({
+      ...prev,
+      exercises: prev.exercises.filter((_, i) => i !== index),
+    }));
+  };
+
+  const updateExercise = (index: number, field: keyof CustomExercise, value: any) => {
+    setCustomWorkout(prev => ({
+      ...prev,
+      exercises: prev.exercises.map((ex, i) =>
+        i === index ? { ...ex, [field]: value } : ex
+      ),
+    }));
+  };
+
+  const createCustomWorkout = async () => {
+    if (!customWorkout.name.trim() || customWorkout.exercises.length === 0) {
+      alert('Please provide a workout name and add at least one exercise.');
+      return;
+    }
+
+    setSaving(true);
+    setErrorMessage(null);
+    const supabase = createClient();
+
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        console.error('Auth error:', userError);
+        alert('Authentication error. Please log in again.');
+        setSaving(false);
+        return;
+      }
+
+      console.log('Creating workout template for client:', clientId);
+      console.log('User ID:', user.id);
+
+      // Create the workout template
+      const templateData = {
+        title: customWorkout.name,
+        name: customWorkout.name,
+        description: `Custom workout for client`,
+        focus: customWorkout.focus || 'Full Body',
+        duration_minutes: customWorkout.durationMinutes,
+        created_by: user.id,
+        created_for_client_id: clientId,
+        is_custom: true,
+      };
+
+      console.log('Template data:', templateData);
+
+      const { data: template, error: templateError } = await supabase
+        .from('workout_templates')
+        .insert(templateData)
+        .select()
+        .single();
+
+      if (templateError) {
+        console.error('Template creation error:', templateError);
+        console.error('Error code:', templateError.code);
+        console.error('Error message:', templateError.message);
+        console.error('Error details:', templateError.details);
+        alert(`Failed to create workout template: ${templateError.message}`);
+        setSaving(false);
+        return;
+      }
+
+      if (!template) {
+        console.error('No template returned');
+        alert('Failed to create workout template: No data returned');
+        setSaving(false);
+        return;
+      }
+
+      console.log('Template created:', template.id);
+
+      // Add exercises to the template
+      if (customWorkout.exercises.length > 0) {
+        const exerciseInserts = customWorkout.exercises.map((ex, index) => ({
+          template_id: template.id,
+          exercise_id: ex.exerciseId,
+          order_index: index,
+          sets: ex.sets,
+          reps: ex.reps,
+          rest_seconds: ex.restSeconds,
+          notes: ex.notes || null,
+        }));
+
+        console.log('Inserting exercises:', exerciseInserts);
+
+        const { error: exerciseError } = await supabase
+          .from('workout_template_exercises')
+          .insert(exerciseInserts);
+
+        if (exerciseError) {
+          console.error('Exercise insert error:', exerciseError);
+          // Don't return - template was created, just log the error
+        }
+      }
+
+      // Assign the workout to the client's calendar
+      const assignData = {
+        client_id: clientId,
+        template_id: template.id,
+        workout_date: customWorkout.workoutDate,
+        status: 'scheduled',
+      };
+
+      console.log('Assigning workout:', assignData);
+
+      const { error: assignError } = await supabase
+        .from('assigned_workouts')
+        .insert(assignData);
+
+      if (assignError) {
+        console.error('Assign error:', assignError);
+        alert(`Workout created but failed to assign to calendar: ${assignError.message}`);
+      } else {
+        console.log('Workout created and assigned successfully!');
+        alert('Custom workout created and assigned!');
+        setShowCustomWorkoutModal(false);
+        setCustomWorkout({
+          name: '',
+          focus: '',
+          durationMinutes: 45,
+          workoutDate: new Date().toISOString().split('T')[0],
+          exercises: [],
+        });
+        fetchClientData();
+      }
+    } catch (err) {
+      console.error('Unexpected error creating workout:', err);
+      alert('An unexpected error occurred. Check the console for details.');
     }
 
     setSaving(false);
@@ -207,6 +474,10 @@ export default function ClientDetailPage() {
               Message
             </Button>
           </Link>
+          <Button onClick={() => setShowCustomWorkoutModal(true)} variant="outline">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Workout
+          </Button>
           <Button onClick={() => setShowAssignModal(true)} variant="primary">
             <Dumbbell className="h-4 w-4 mr-2" />
             Assign Program
@@ -371,6 +642,260 @@ export default function ClientDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Upcoming Workouts */}
+      <Card className="mt-6">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-black flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-blue-600" />
+              Upcoming Workouts
+            </h2>
+            <Button onClick={() => setShowCustomWorkoutModal(true)} variant="outline" size="sm">
+              <Plus className="h-4 w-4 mr-1" />
+              Add Workout
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {assignedWorkouts.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {assignedWorkouts.map((workout) => (
+                <div
+                  key={workout.id}
+                  className={`p-4 border ${
+                    workout.status === 'completed'
+                      ? 'border-green-200 bg-green-50'
+                      : 'border-grey-200 bg-grey-50'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs text-grey-500">
+                        {new Date(workout.workout_date + 'T00:00:00').toLocaleDateString('en-US', {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </p>
+                      <p className="font-medium text-black mt-1">
+                        {workout.template?.name || 'Workout'}
+                      </p>
+                      {workout.template?.focus && (
+                        <p className="text-xs text-grey-500">{workout.template.focus}</p>
+                      )}
+                    </div>
+                    <span
+                      className={`text-xs px-2 py-0.5 ${
+                        workout.status === 'completed'
+                          ? 'bg-green-100 text-green-700'
+                          : workout.status === 'scheduled'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-grey-100 text-grey-600'
+                      }`}
+                    >
+                      {workout.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Calendar className="h-10 w-10 mx-auto text-grey-300 mb-3" />
+              <p className="text-grey-500 text-sm mb-4">No upcoming workouts scheduled</p>
+              <Button onClick={() => setShowCustomWorkoutModal(true)} variant="primary">
+                <Plus className="h-4 w-4 mr-2" />
+                Add First Workout
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Custom Workout Modal */}
+      {showCustomWorkoutModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-black">Create Custom Workout</h3>
+                <button onClick={() => setShowCustomWorkoutModal(false)} className="text-grey-400 hover:text-black">
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Workout Details */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-black mb-2">
+                      Workout Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={customWorkout.name}
+                      onChange={(e) => setCustomWorkout({ ...customWorkout, name: e.target.value })}
+                      placeholder="e.g., Upper Body Push Day"
+                      className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">
+                      Focus Area
+                    </label>
+                    <select
+                      value={customWorkout.focus}
+                      onChange={(e) => setCustomWorkout({ ...customWorkout, focus: e.target.value })}
+                      className="w-full border border-grey-300 px-4 py-3 text-black bg-white focus:outline-none focus:border-blue-600"
+                    >
+                      <option value="">Select focus...</option>
+                      <option value="Upper Body">Upper Body</option>
+                      <option value="Lower Body">Lower Body</option>
+                      <option value="Full Body">Full Body</option>
+                      <option value="Push">Push</option>
+                      <option value="Pull">Pull</option>
+                      <option value="Legs">Legs</option>
+                      <option value="Core">Core</option>
+                      <option value="Cardio">Cardio</option>
+                      <option value="HIIT">HIIT</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">
+                      Duration (minutes)
+                    </label>
+                    <input
+                      type="number"
+                      value={customWorkout.durationMinutes}
+                      onChange={(e) => setCustomWorkout({ ...customWorkout, durationMinutes: parseInt(e.target.value) || 45 })}
+                      className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-black mb-2">
+                      Scheduled Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={customWorkout.workoutDate}
+                      onChange={(e) => setCustomWorkout({ ...customWorkout, workoutDate: e.target.value })}
+                      className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                </div>
+
+                {/* Add Exercise */}
+                <div className="border-t border-grey-200 pt-6">
+                  <h4 className="font-semibold text-black mb-4">Exercises</h4>
+                  <div className="flex gap-2 mb-4">
+                    <select
+                      value={selectedExerciseId}
+                      onChange={(e) => setSelectedExerciseId(e.target.value)}
+                      className="flex-1 border border-grey-300 px-4 py-3 text-black bg-white focus:outline-none focus:border-blue-600"
+                    >
+                      <option value="">Select exercise to add...</option>
+                      {allExercises.map(ex => (
+                        <option key={ex.id} value={ex.id}>
+                          {ex.name} ({ex.muscle_group || 'General'})
+                        </option>
+                      ))}
+                    </select>
+                    <Button onClick={addExerciseToWorkout} variant="outline" disabled={!selectedExerciseId}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {/* Exercise List */}
+                  {customWorkout.exercises.length > 0 ? (
+                    <div className="space-y-3">
+                      {customWorkout.exercises.map((ex, index) => (
+                        <div key={index} className="border border-grey-200 p-4 bg-grey-50">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
+                                {index + 1}
+                              </div>
+                              <span className="font-medium text-black">{ex.exerciseName}</span>
+                            </div>
+                            <button
+                              onClick={() => removeExerciseFromWorkout(index)}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-xs text-grey-500 mb-1">Sets</label>
+                              <input
+                                type="number"
+                                value={ex.sets}
+                                onChange={(e) => updateExercise(index, 'sets', parseInt(e.target.value) || 3)}
+                                className="w-full border border-grey-300 px-3 py-2 text-black text-sm focus:outline-none focus:border-blue-600"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-grey-500 mb-1">Reps</label>
+                              <input
+                                type="text"
+                                value={ex.reps}
+                                onChange={(e) => updateExercise(index, 'reps', e.target.value)}
+                                placeholder="10 or 8-12"
+                                className="w-full border border-grey-300 px-3 py-2 text-black text-sm focus:outline-none focus:border-blue-600"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-grey-500 mb-1">Rest (sec)</label>
+                              <input
+                                type="number"
+                                value={ex.restSeconds}
+                                onChange={(e) => updateExercise(index, 'restSeconds', parseInt(e.target.value) || 60)}
+                                className="w-full border border-grey-300 px-3 py-2 text-black text-sm focus:outline-none focus:border-blue-600"
+                              />
+                            </div>
+                          </div>
+                          <div className="mt-3">
+                            <label className="block text-xs text-grey-500 mb-1">Notes (optional)</label>
+                            <input
+                              type="text"
+                              value={ex.notes}
+                              onChange={(e) => updateExercise(index, 'notes', e.target.value)}
+                              placeholder="e.g., Tempo 3-1-3, RPE 8"
+                              className="w-full border border-grey-300 px-3 py-2 text-black text-sm focus:outline-none focus:border-blue-600"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 bg-grey-50 border border-dashed border-grey-300">
+                      <Dumbbell className="h-8 w-8 mx-auto text-grey-300 mb-2" />
+                      <p className="text-grey-500 text-sm">No exercises added yet</p>
+                      <p className="text-grey-400 text-xs">Select an exercise above to get started</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <Button onClick={() => setShowCustomWorkoutModal(false)} variant="outline" className="flex-1">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={createCustomWorkout}
+                  variant="primary"
+                  className="flex-1"
+                  disabled={saving || !customWorkout.name || customWorkout.exercises.length === 0}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {saving ? 'Creating...' : 'Create & Assign Workout'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Assign Program Modal */}
       {showAssignModal && (

@@ -97,14 +97,14 @@ export default function RegisterPage() {
         console.error('Profile creation error:', profileError);
       }
 
-      // Create client details
-      const { error: detailsError } = await supabase.from('client_details').insert({
+      // Create/update client details (trigger may have already created the row)
+      const { error: detailsError } = await supabase.from('client_details').upsert({
         user_id: data.user.id,
         workout_days_per_week: parseInt(formData.workoutDays),
         availability: formData.availability,
         goals: formData.goals,
         onboarding_completed: false,
-      });
+      }, { onConflict: 'user_id' });
 
       if (detailsError) {
         console.error('Client details error:', detailsError);
