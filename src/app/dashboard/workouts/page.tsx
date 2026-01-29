@@ -465,30 +465,30 @@ export default function WorkoutsPage() {
 
           {/* Program Overview */}
           {program && (
-            <Card className="bg-black text-white">
-              <CardContent className="p-6">
+            <Card className="border-2 border-blue-600">
+              <CardContent className="p-6 bg-white">
                 <div className="flex items-center gap-2 mb-4">
-                  <Target className="h-5 w-5 text-blue-500" />
-                  <h3 className="font-semibold">Program Overview</h3>
+                  <Target className="h-5 w-5 text-blue-600" />
+                  <h3 className="font-semibold text-black">Program Overview</h3>
                 </div>
                 <div className="space-y-4">
                   <div>
-                    <p className="text-grey-300 text-sm">Current Program</p>
-                    <p className="font-semibold">{program.program_name}</p>
+                    <p className="text-grey-500 text-sm">Current Program</p>
+                    <p className="font-semibold text-black">{program.program_name}</p>
                   </div>
                   <div>
-                    <p className="text-grey-300 text-sm">Week</p>
-                    <p className="font-semibold">{program.current_week} of {program.total_weeks}</p>
+                    <p className="text-grey-500 text-sm">Week</p>
+                    <p className="font-semibold text-black">{program.current_week} of {program.total_weeks}</p>
                   </div>
                 </div>
-                <div className="mt-6 pt-4 border-t border-grey-800">
+                <div className="mt-6 pt-4 border-t border-grey-200">
                   <div className="flex justify-between text-sm">
-                    <span className="text-grey-300">Workouts Completed</span>
-                    <span className="text-blue-500 font-semibold">{completedWorkouts}</span>
+                    <span className="text-grey-500">Workouts Completed</span>
+                    <span className="text-blue-600 font-semibold">{completedWorkouts}</span>
                   </div>
-                  <div className="mt-2 h-2 bg-grey-800">
+                  <div className="mt-2 h-2 bg-grey-200 rounded">
                     <div
-                      className="h-full bg-blue-600"
+                      className="h-full bg-blue-600 rounded"
                       style={{ width: `${progressPercentage}%` }}
                     />
                   </div>

@@ -27,7 +27,7 @@ const faqs = [
   },
   {
     question: 'What should I bring to sessions?',
-    answer: 'Just bring yourself, a positive attitude, and workout clothes. Water and towels are provided. If you have any specific equipment you prefer (lifting shoes, belt, etc.), feel free to bring those as well.',
+    answer: 'Bring yourself, a positive attitude, workout clothes, your own water bottle, and a towel. If you have any specific equipment you prefer (lifting shoes, belt, etc.), feel free to bring those as well.',
   },
   {
     question: 'Do you offer nutrition guidance?',

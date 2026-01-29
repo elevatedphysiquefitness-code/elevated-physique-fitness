@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { CheckCircle, Plus, Flame, Calendar, X, TrendingUp } from 'lucide-react';
+import { CheckCircle, Plus, Flame, Calendar, X, TrendingUp, Trash2 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 
 interface Habit {
@@ -211,6 +211,33 @@ export default function HabitsPage() {
     }
   };
 
+  const deleteHabit = async (habitId: string) => {
+    if (!confirm('Are you sure you want to delete this habit?')) return;
+
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    // Soft delete by setting is_active to false
+    const { error } = await supabase
+      .from('habits')
+      .update({ is_active: false })
+      .eq('id', habitId)
+      .eq('client_id', user.id);
+
+    if (error) {
+      alert('Failed to delete habit. Please try again.');
+      console.error('Error deleting habit:', error);
+    } else {
+      setHabits(habits.filter(h => h.id !== habitId));
+      // Also remove from today's logs
+      const newLogs = { ...todayLogs };
+      delete newLogs[habitId];
+      setTodayLogs(newLogs);
+    }
+  };
+
   const addDefaultHabits = async () => {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -332,31 +359,40 @@ export default function HabitsPage() {
             {habits.map((habit) => {
               const isCompleted = todayLogs[habit.id] || false;
               return (
-                <li key={habit.id}>
-                  <button
-                    onClick={() => toggleHabit(habit.id)}
-                    className={`w-full flex items-center gap-4 p-4 transition-colors text-left ${
-                      isCompleted ? 'bg-green-50' : 'bg-grey-50 hover:bg-grey-100'
-                    }`}
-                  >
-                    <div
-                      className={`w-6 h-6 flex items-center justify-center border-2 transition-colors ${
-                        isCompleted
-                          ? 'bg-green-600 border-green-600'
-                          : 'border-grey-300'
-                      }`}
+                <li key={habit.id} className="group">
+                  <div className={`flex items-center gap-2 transition-colors ${
+                    isCompleted ? 'bg-green-50' : 'bg-grey-50 hover:bg-grey-100'
+                  }`}>
+                    <button
+                      onClick={() => toggleHabit(habit.id)}
+                      className="flex-1 flex items-center gap-4 p-4 text-left"
                     >
-                      {isCompleted && <CheckCircle className="h-4 w-4 text-white" />}
-                    </div>
-                    <div className="flex-1">
-                      <p className={`font-medium ${isCompleted ? 'text-grey-500 line-through' : 'text-black'}`}>
-                        {habit.name}
-                      </p>
-                      {habit.description && (
-                        <p className="text-sm text-grey-500 mt-0.5">{habit.description}</p>
-                      )}
-                    </div>
-                  </button>
+                      <div
+                        className={`w-6 h-6 flex items-center justify-center border-2 transition-colors ${
+                          isCompleted
+                            ? 'bg-green-600 border-green-600'
+                            : 'border-grey-300'
+                        }`}
+                      >
+                        {isCompleted && <CheckCircle className="h-4 w-4 text-white" />}
+                      </div>
+                      <div className="flex-1">
+                        <p className={`font-medium ${isCompleted ? 'text-grey-500 line-through' : 'text-black'}`}>
+                          {habit.name}
+                        </p>
+                        {habit.description && (
+                          <p className="text-sm text-grey-500 mt-0.5">{habit.description}</p>
+                        )}
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => deleteHabit(habit.id)}
+                      className="p-3 text-grey-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all"
+                      title="Delete habit"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </button>
+                  </div>
                 </li>
               );
             })}

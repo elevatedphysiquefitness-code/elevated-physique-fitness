@@ -70,7 +70,7 @@ export default function DashboardSidebar({ isOpen, onClose }: DashboardSidebarPr
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-grey-800">
             <Link href="/dashboard" className="text-lg font-bold tracking-tight uppercase">
-              Elevated<span className="text-blue-500">.</span>
+              Elevated Physique
             </Link>
             <button
               onClick={onClose}

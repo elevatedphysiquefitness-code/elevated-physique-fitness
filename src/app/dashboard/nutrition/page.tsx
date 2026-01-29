@@ -400,16 +400,16 @@ export default function NutritionPage() {
 
       {/* Macro Calculator Results */}
       {macros ? (
-        <Card className="bg-black text-white">
-          <CardContent className="p-6">
+        <Card className="border-2 border-blue-600">
+          <CardContent className="p-6 bg-white">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-blue-600 flex items-center justify-center">
                   <Target className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold">Your Daily Targets</h2>
-                  <p className="text-grey-300 text-sm">
+                  <h2 className="text-lg font-bold text-black">Your Daily Targets</h2>
+                  <p className="text-grey-600 text-sm">
                     Based on {clientData.weight} lbs{clientData.bodyFatPercentage ? ` | ${clientData.bodyFatPercentage}% BF` : ''} | {goalLabels[clientData.goal || 'maintenance']}
                   </p>
                 </div>
@@ -424,46 +424,46 @@ export default function NutritionPage() {
                   });
                   setShowSettingsModal(true);
                 }}
-                className="text-grey-400 hover:text-white"
+                className="text-grey-500 hover:text-black"
               >
                 <Settings className="h-5 w-5" />
               </button>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              <div className="text-center">
-                <div className="w-16 h-16 mx-auto bg-orange-600 rounded-full flex items-center justify-center mb-3">
-                  <Flame className="h-8 w-8 text-white" />
+              <div className="text-center bg-orange-50 p-4 rounded-lg">
+                <div className="w-14 h-14 mx-auto bg-orange-600 rounded-full flex items-center justify-center mb-3">
+                  <Flame className="h-7 w-7 text-white" />
                 </div>
-                <p className="text-3xl font-bold">{macros.calories}</p>
-                <p className="text-grey-400 text-sm">Calories</p>
+                <p className="text-3xl font-bold text-orange-600">{macros.calories}</p>
+                <p className="text-orange-700 text-sm font-medium">Calories</p>
               </div>
-              <div className="text-center">
-                <div className="w-16 h-16 mx-auto bg-red-600 rounded-full flex items-center justify-center mb-3">
-                  <Beef className="h-8 w-8 text-white" />
+              <div className="text-center bg-red-50 p-4 rounded-lg">
+                <div className="w-14 h-14 mx-auto bg-red-600 rounded-full flex items-center justify-center mb-3">
+                  <Beef className="h-7 w-7 text-white" />
                 </div>
-                <p className="text-3xl font-bold">{macros.protein}g</p>
-                <p className="text-grey-400 text-sm">Protein</p>
+                <p className="text-3xl font-bold text-red-600">{macros.protein}g</p>
+                <p className="text-red-700 text-sm font-medium">Protein</p>
               </div>
-              <div className="text-center">
-                <div className="w-16 h-16 mx-auto bg-yellow-600 rounded-full flex items-center justify-center mb-3">
-                  <Wheat className="h-8 w-8 text-white" />
+              <div className="text-center bg-yellow-50 p-4 rounded-lg">
+                <div className="w-14 h-14 mx-auto bg-yellow-600 rounded-full flex items-center justify-center mb-3">
+                  <Wheat className="h-7 w-7 text-white" />
                 </div>
-                <p className="text-3xl font-bold">{macros.carbs}g</p>
-                <p className="text-grey-400 text-sm">Carbs</p>
+                <p className="text-3xl font-bold text-yellow-600">{macros.carbs}g</p>
+                <p className="text-yellow-700 text-sm font-medium">Carbs</p>
               </div>
-              <div className="text-center">
-                <div className="w-16 h-16 mx-auto bg-green-600 rounded-full flex items-center justify-center mb-3">
-                  <Apple className="h-8 w-8 text-white" />
+              <div className="text-center bg-green-50 p-4 rounded-lg">
+                <div className="w-14 h-14 mx-auto bg-green-600 rounded-full flex items-center justify-center mb-3">
+                  <Apple className="h-7 w-7 text-white" />
                 </div>
-                <p className="text-3xl font-bold">{macros.fats}g</p>
-                <p className="text-grey-400 text-sm">Fats</p>
+                <p className="text-3xl font-bold text-green-600">{macros.fats}g</p>
+                <p className="text-green-700 text-sm font-medium">Fats</p>
               </div>
             </div>
 
-            <div className="mt-6 pt-6 border-t border-grey-800">
-              <p className="text-sm text-grey-400 text-center">
-                Water intake: {clientData.weight ? Math.round((clientData.weight / 2)) : '--'} oz daily minimum
+            <div className="mt-6 pt-6 border-t border-grey-200">
+              <p className="text-sm text-blue-600 text-center font-medium">
+                💧 Water intake: {clientData.weight ? Math.round((clientData.weight / 2)) : '--'} oz daily minimum
               </p>
             </div>
           </CardContent>

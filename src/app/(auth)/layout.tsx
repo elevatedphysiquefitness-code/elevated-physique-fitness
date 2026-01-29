@@ -12,7 +12,7 @@ export default function AuthLayout({
         <div className="mx-auto max-w-7xl">
           <Link href="/" className="inline-block">
             <span className="text-xl font-bold tracking-tight uppercase text-black">
-              Elevated Physique<span className="text-blue-600">.</span>
+              Elevated Physique
             </span>
           </Link>
         </div>

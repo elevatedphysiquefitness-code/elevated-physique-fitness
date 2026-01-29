@@ -31,6 +31,14 @@ interface Measurement {
   thigh: number | null;
   bicep: number | null;
   notes: string | null;
+  // InBody data
+  skeletal_muscle_mass: number | null;
+  body_fat_mass: number | null;
+  total_body_water: number | null;
+  lean_body_mass: number | null;
+  bmi: number | null;
+  basal_metabolic_rate: number | null;
+  visceral_fat_level: number | null;
 }
 
 interface ProgressPhoto {
@@ -61,6 +69,14 @@ export default function ProgressPage() {
     thigh: '',
     bicep: '',
     notes: '',
+    // InBody fields
+    skeletalMuscleMass: '',
+    bodyFatMass: '',
+    totalBodyWater: '',
+    leanBodyMass: '',
+    bmi: '',
+    basalMetabolicRate: '',
+    visceralFatLevel: '',
   });
 
   useEffect(() => {
@@ -125,6 +141,14 @@ export default function ProgressPage() {
         thigh: newMeasurement.thigh ? parseFloat(newMeasurement.thigh) : null,
         bicep: newMeasurement.bicep ? parseFloat(newMeasurement.bicep) : null,
         notes: newMeasurement.notes || null,
+        // InBody data
+        skeletal_muscle_mass: newMeasurement.skeletalMuscleMass ? parseFloat(newMeasurement.skeletalMuscleMass) : null,
+        body_fat_mass: newMeasurement.bodyFatMass ? parseFloat(newMeasurement.bodyFatMass) : null,
+        total_body_water: newMeasurement.totalBodyWater ? parseFloat(newMeasurement.totalBodyWater) : null,
+        lean_body_mass: newMeasurement.leanBodyMass ? parseFloat(newMeasurement.leanBodyMass) : null,
+        bmi: newMeasurement.bmi ? parseFloat(newMeasurement.bmi) : null,
+        basal_metabolic_rate: newMeasurement.basalMetabolicRate ? parseFloat(newMeasurement.basalMetabolicRate) : null,
+        visceral_fat_level: newMeasurement.visceralFatLevel ? parseFloat(newMeasurement.visceralFatLevel) : null,
       });
 
     if (error) {
@@ -140,6 +164,13 @@ export default function ProgressPage() {
         thigh: '',
         bicep: '',
         notes: '',
+        skeletalMuscleMass: '',
+        bodyFatMass: '',
+        totalBodyWater: '',
+        leanBodyMass: '',
+        bmi: '',
+        basalMetabolicRate: '',
+        visceralFatLevel: '',
       });
       setShowAddModal(false);
       fetchProgress();
@@ -695,6 +726,13 @@ function MeasurementModal({
     thigh: string;
     bicep: string;
     notes: string;
+    skeletalMuscleMass: string;
+    bodyFatMass: string;
+    totalBodyWater: string;
+    leanBodyMass: string;
+    bmi: string;
+    basalMetabolicRate: string;
+    visceralFatLevel: string;
   };
   setNewMeasurement: React.Dispatch<React.SetStateAction<{
     weight: string;
@@ -705,11 +743,19 @@ function MeasurementModal({
     thigh: string;
     bicep: string;
     notes: string;
+    skeletalMuscleMass: string;
+    bodyFatMass: string;
+    totalBodyWater: string;
+    leanBodyMass: string;
+    bmi: string;
+    basalMetabolicRate: string;
+    visceralFatLevel: string;
   }>>;
   onSave: () => void;
   onClose: () => void;
   saving: boolean;
 }) {
+  const [showInBody, setShowInBody] = useState(false);
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -824,6 +870,125 @@ function MeasurementModal({
                 placeholder="e.g., 15"
                 className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
               />
+            </div>
+
+            {/* InBody Data Section */}
+            <div className="border-t border-grey-200 pt-4 mt-4">
+              <button
+                type="button"
+                onClick={() => setShowInBody(!showInBody)}
+                className="flex items-center gap-2 text-blue-600 font-medium text-sm hover:text-blue-700"
+              >
+                {showInBody ? '− Hide' : '+ Add'} InBody Data
+              </button>
+
+              {showInBody && (
+                <div className="mt-4 space-y-4 bg-blue-50 p-4 border border-blue-100">
+                  <p className="text-xs text-blue-700 mb-3">
+                    Enter data from your InBody scan for detailed body composition tracking
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-black mb-2">
+                        Skeletal Muscle Mass (lbs)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={newMeasurement.skeletalMuscleMass}
+                        onChange={(e) => setNewMeasurement({ ...newMeasurement, skeletalMuscleMass: e.target.value })}
+                        placeholder="e.g., 75.5"
+                        className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-black mb-2">
+                        Body Fat Mass (lbs)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={newMeasurement.bodyFatMass}
+                        onChange={(e) => setNewMeasurement({ ...newMeasurement, bodyFatMass: e.target.value })}
+                        placeholder="e.g., 35.2"
+                        className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600 bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-black mb-2">
+                        Total Body Water (lbs)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={newMeasurement.totalBodyWater}
+                        onChange={(e) => setNewMeasurement({ ...newMeasurement, totalBodyWater: e.target.value })}
+                        placeholder="e.g., 95.0"
+                        className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-black mb-2">
+                        Lean Body Mass (lbs)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={newMeasurement.leanBodyMass}
+                        onChange={(e) => setNewMeasurement({ ...newMeasurement, leanBodyMass: e.target.value })}
+                        placeholder="e.g., 145.0"
+                        className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600 bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-black mb-2">
+                        BMI
+                      </label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={newMeasurement.bmi}
+                        onChange={(e) => setNewMeasurement({ ...newMeasurement, bmi: e.target.value })}
+                        placeholder="e.g., 24.5"
+                        className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-black mb-2">
+                        BMR (kcal)
+                      </label>
+                      <input
+                        type="number"
+                        step="1"
+                        value={newMeasurement.basalMetabolicRate}
+                        onChange={(e) => setNewMeasurement({ ...newMeasurement, basalMetabolicRate: e.target.value })}
+                        placeholder="e.g., 1850"
+                        className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-black mb-2">
+                        Visceral Fat
+                      </label>
+                      <input
+                        type="number"
+                        step="1"
+                        value={newMeasurement.visceralFatLevel}
+                        onChange={(e) => setNewMeasurement({ ...newMeasurement, visceralFatLevel: e.target.value })}
+                        placeholder="e.g., 8"
+                        className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600 bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>

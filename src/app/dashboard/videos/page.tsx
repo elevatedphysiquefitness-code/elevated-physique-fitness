@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { PlayCircle, Search, Filter, Video, X } from 'lucide-react';
+import { PlayCircle, Search, Filter, Video, X, Play } from 'lucide-react';
+import Image from 'next/image';
 
 interface Exercise {
   id: string;
@@ -43,6 +44,18 @@ function getEmbedUrl(url: string | null): string | null {
   }
 
   return url;
+}
+
+// Get YouTube thumbnail URL from video URL
+function getThumbnailUrl(url: string | null): string | null {
+  if (!url) return null;
+
+  const watchMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+  if (watchMatch) {
+    return `https://img.youtube.com/vi/${watchMatch[1]}/mqdefault.jpg`;
+  }
+
+  return null;
 }
 
 export default function VideosPage() {
@@ -172,11 +185,27 @@ export default function VideosPage() {
               >
                 <div className="aspect-video bg-grey-200 flex items-center justify-center mb-4 relative overflow-hidden">
                   {exercise.youtube_url ? (
-                    <PlayCircle className="h-12 w-12 text-grey-400 group-hover:text-blue-600 transition-colors" />
+                    <>
+                      {getThumbnailUrl(exercise.youtube_url) ? (
+                        <Image
+                          src={getThumbnailUrl(exercise.youtube_url)!}
+                          alt={exercise.name}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        />
+                      ) : (
+                        <Video className="h-12 w-12 text-grey-300" />
+                      )}
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                        <div className="w-14 h-14 bg-blue-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+                          <Play className="h-6 w-6 text-white ml-1" />
+                        </div>
+                      </div>
+                    </>
                   ) : (
                     <Video className="h-12 w-12 text-grey-300" />
                   )}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                 </div>
                 <span className="text-xs text-blue-600 font-medium uppercase">{exercise.muscle_group}</span>
                 <h3 className="font-bold text-black mt-1 group-hover:text-blue-600 transition-colors">

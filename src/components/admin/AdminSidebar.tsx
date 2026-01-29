@@ -65,7 +65,7 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-grey-800">
             <Link href="/admin" className="text-lg font-bold tracking-tight uppercase">
-              Admin<span className="text-blue-500">.</span>
+              Admin Panel
             </Link>
             <button
               onClick={onClose}

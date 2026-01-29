@@ -37,7 +37,7 @@ export default function Footer() {
           <div className="lg:col-span-1">
             <Link href="/" className="inline-block">
               <span className="text-xl font-bold tracking-tight uppercase">
-                Elevated Physique<span className="text-blue-500">.</span>
+                Elevated Physique
               </span>
             </Link>
             <p className="mt-4 text-grey-400 text-sm leading-relaxed">

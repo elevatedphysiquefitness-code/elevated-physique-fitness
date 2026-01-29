@@ -73,7 +73,7 @@ INSERT INTO exercises (name, muscle_group, youtube_url, description, difficulty_
 ('Overhead Tricep Extension', 'Triceps', 'https://www.youtube.com/watch?v=_gsUck-7M74', 'Overhead extension with dumbbell or cable for long head.', 'beginner', false, ARRAY['Triceps'], ARRAY['Dumbbell']),
 ('Rope Pushdown', 'Triceps', 'https://www.youtube.com/watch?v=vB5OHsJ3EME', 'Cable pushdown with rope attachment for lateral head focus.', 'beginner', false, ARRAY['Triceps'], ARRAY['Cable Machine', 'Rope Attachment']),
 ('Diamond Push-Ups', 'Triceps', 'https://www.youtube.com/watch?v=J0DnG1_S92I', 'Close hand position push-ups for tricep emphasis.', 'intermediate', true, ARRAY['Triceps', 'Chest'], ARRAY['None']),
-('Bench Dips', 'Triceps', 'https://www.youtube.com/watch?v=0326dy_-CzM', 'Bodyweight dips using a bench for support.', 'beginner', true, ARRAY['Triceps'], ARRAY['Bench']),
+('Bench Dips', 'Triceps', 'https://www.youtube.com/watch?v=c3ZGl4pAwZ4', 'Bodyweight dips using a bench for support.', 'beginner', true, ARRAY['Triceps'], ARRAY['Bench']),
 ('Cable Overhead Extension', 'Triceps', 'https://www.youtube.com/watch?v=kiuVA0gs3EI', 'Cable extension overhead for long head stretch.', 'beginner', false, ARRAY['Triceps'], ARRAY['Cable Machine']),
 ('Kickbacks', 'Triceps', 'https://www.youtube.com/watch?v=ZO81bExngMI', 'Bent-over dumbbell tricep extension.', 'beginner', false, ARRAY['Triceps'], ARRAY['Dumbbell'])
 ON CONFLICT (name) DO UPDATE SET youtube_url = EXCLUDED.youtube_url, description = EXCLUDED.description, difficulty_level = EXCLUDED.difficulty_level, is_compound = EXCLUDED.is_compound, primary_muscles = EXCLUDED.primary_muscles, equipment_required = EXCLUDED.equipment_required;
@@ -147,7 +147,7 @@ ON CONFLICT (name) DO UPDATE SET youtube_url = EXCLUDED.youtube_url, description
 
 -- CARDIO EXERCISES
 INSERT INTO exercises (name, muscle_group, youtube_url, description, difficulty_level, is_compound, primary_muscles, equipment_required) VALUES
-('Treadmill Running', 'Cardio', 'https://www.youtube.com/watch?v=8iPEnn-ltC8', 'Indoor running for cardiovascular fitness.', 'beginner', true, ARRAY['Cardiovascular', 'Legs'], ARRAY['Treadmill']),
+('Treadmill Running', 'Cardio', 'https://www.youtube.com/watch?v=9L2b2khySLE', 'Indoor running for cardiovascular fitness.', 'beginner', true, ARRAY['Cardiovascular', 'Legs'], ARRAY['Treadmill']),
 ('Rowing Machine', 'Cardio', 'https://www.youtube.com/watch?v=mZLSbbAfuFo', 'Full body cardio machine with pulling motion.', 'beginner', true, ARRAY['Cardiovascular', 'Back', 'Legs'], ARRAY['Rowing Machine']),
 ('Stair Climber', 'Cardio', 'https://www.youtube.com/watch?v=y_kJZPGz5sw', 'Step climbing machine for cardio and leg endurance.', 'beginner', true, ARRAY['Cardiovascular', 'Legs', 'Glutes'], ARRAY['Stair Climber']),
 ('Battle Ropes', 'Cardio', 'https://www.youtube.com/watch?v=ts7TX82V31E', 'High intensity rope training for conditioning.', 'intermediate', true, ARRAY['Shoulders', 'Core', 'Cardiovascular'], ARRAY['Battle Ropes']),

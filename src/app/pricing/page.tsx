@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import SectionHeading from '@/components/ui/SectionHeading';
 import Button from '@/components/ui/Button';
-import { ArrowRight, MapPin, Laptop, Check } from 'lucide-react';
+import { ArrowRight, MapPin, Laptop, Check, Gift } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Pricing | Elevated Physique Fitness',
@@ -269,6 +269,38 @@ export default function PricingPage() {
               View All Membership Benefits
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Welcome Gift Section */}
+      <section className="py-24 bg-white">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl mx-auto text-center">
+            <div className="w-16 h-16 bg-blue-600 mx-auto mb-6 flex items-center justify-center">
+              <Gift className="h-8 w-8 text-white" />
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold text-black">
+              Elevated Physique Welcome Gift
+            </h2>
+            <p className="mt-4 text-grey-600">
+              Every new client receives a welcome package to kickstart their fitness journey
+            </p>
+
+            <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[
+                { name: 'Resistance Bands', description: 'Premium bands for mobility and warm-ups' },
+                { name: 'Shaker Bottle', description: 'Elevated Physique branded shaker' },
+                { name: 'Welcome Note', description: 'Personalized welcome from your coach' },
+                { name: 'Nutrition Guide', description: 'Foundational nutrition & meal guide' },
+              ].map((item) => (
+                <div key={item.name} className="bg-grey-100 p-6 text-center">
+                  <div className="w-3 h-3 bg-blue-600 mx-auto mb-4" />
+                  <h3 className="font-bold text-black">{item.name}</h3>
+                  <p className="mt-2 text-sm text-grey-600">{item.description}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
