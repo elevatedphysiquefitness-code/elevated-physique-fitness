@@ -21,15 +21,15 @@ export default function Header() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-[#EBE4D6] border-b border-[#D4C4A8]">
       <nav className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-32 sm:h-36 items-center justify-between">
+        <div className="flex h-20 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center">
             <Image
               src="/logo.png"
               alt="Elevated Physique Fitness"
-              width={250}
-              height={250}
-              className="h-28 sm:h-32 w-auto"
+              width={300}
+              height={300}
+              className="h-36 sm:h-44 w-auto -my-8"
               priority
             />
           </Link>
