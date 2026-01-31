@@ -95,6 +95,38 @@ export async function POST(request: Request) {
 
     const body: WorkoutRequest = await request.json();
 
+    // Check if glutes is the primary focus - auto-assign Booty Building program
+    const isGluteFocused = body.bodyPartGoals.length > 0 &&
+      (body.bodyPartGoals[0] === 'glutes' ||
+       (body.bodyPartGoals.length === 1 && body.bodyPartGoals.includes('glutes')));
+
+    if (isGluteFocused) {
+      const supabase = getSupabaseClient();
+
+      // Check if Booty Building program exists
+      const { data: bootyProgram } = await supabase
+        .from('workout_programs')
+        .select('id, title, description, duration_weeks')
+        .eq('title', 'Booty Building')
+        .single();
+
+      if (bootyProgram) {
+        // Auto-assign the pre-made Booty Building program
+        const assigned = await assignPremadeProgram(user.id, bootyProgram, supabase);
+        if (assigned) {
+          return NextResponse.json({
+            success: true,
+            program: {
+              name: bootyProgram.title,
+              description: bootyProgram.description,
+              duration_weeks: bootyProgram.duration_weeks,
+              isPreMade: true
+            }
+          });
+        }
+      }
+    }
+
     // Check if API key is configured
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json(
@@ -248,6 +280,76 @@ Return the program as a JSON object with the following structure:
 \`\`\`
 
 Generate a complete, professional workout program now:`;
+}
+
+async function assignPremadeProgram(
+  userId: string,
+  program: { id: string; title: string; description: string; duration_weeks: number },
+  supabase: ReturnType<typeof getSupabaseClient>
+): Promise<boolean> {
+  try {
+    // Deactivate any existing active programs for this client
+    await supabase
+      .from('client_programs')
+      .update({ status: 'completed' })
+      .eq('client_id', userId)
+      .eq('status', 'active');
+
+    // Assign the pre-made program
+    const startDate = new Date();
+    const { error: assignError } = await supabase
+      .from('client_programs')
+      .insert({
+        client_id: userId,
+        program_id: program.id,
+        program_name: program.title,
+        start_date: startDate.toISOString().split('T')[0],
+        current_week: 1,
+        total_weeks: program.duration_weeks,
+        status: 'active',
+        is_custom: false,
+        assignment_notes: 'Auto-assigned based on glute focus selection during onboarding',
+      });
+
+    if (assignError) {
+      console.error('Error assigning Booty Building program:', assignError);
+      return false;
+    }
+
+    // Get workout templates for this program
+    const { data: templates } = await supabase
+      .from('workout_templates')
+      .select('id, day_number')
+      .eq('program_id', program.id)
+      .order('day_number', { ascending: true });
+
+    if (templates && templates.length > 0) {
+      // Create assigned workouts for the first week
+      const dayOfWeek = startDate.getDay();
+      const mondayOffset = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : 8 - dayOfWeek;
+      const nextMonday = new Date(startDate);
+      nextMonday.setDate(startDate.getDate() + mondayOffset);
+
+      for (let i = 0; i < templates.length; i++) {
+        const workoutDate = new Date(nextMonday);
+        workoutDate.setDate(nextMonday.getDate() + i);
+
+        await supabase
+          .from('assigned_workouts')
+          .insert({
+            client_id: userId,
+            template_id: templates[i].id,
+            workout_date: workoutDate.toISOString().split('T')[0],
+            status: 'scheduled',
+          });
+      }
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in assignPremadeProgram:', error);
+    return false;
+  }
 }
 
 async function saveGeneratedProgram(

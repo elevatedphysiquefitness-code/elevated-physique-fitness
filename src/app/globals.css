@@ -1,33 +1,48 @@
 @import "tailwindcss";
 
 :root {
-  /* Brand Colors - Elevated Physique Fitness - Brown Palette */
-  /* Using dark brown instead of black for a warmer feel */
-  --black: #2C1810; /* dark chocolate brown instead of pure black */
-  --black-light: #3D2314;
+  /* Brand Colors - Elevated Physique Fitness - Named Brown Palette */
 
-  /* Brown Color Palette */
-  --brown-900: #3D2314; /* dark brown - headers, buttons, accents */
-  --brown-800: #4D2E1A;
-  --brown-700: #6B4423; /* medium brown - secondary elements, borders */
-  --brown-600: #8B5A2B;
-  --brown-500: #A67B5B; /* light brown - backgrounds, cards */
-  --brown-400: #C49A6C;
-  --brown-300: #D4B896; /* cream/tan - light backgrounds, hover states */
-  --brown-200: #E8D4B8;
-  --brown-100: #F5EBE0;
-  --brown-50: #FAF6F1; /* lightest cream */
+  /* Named Brown Colors - True Brown Palette (no orange) */
+  --biscotti: #D4C4A8;      /* Light warm beige - like the Italian cookie */
+  --biscotti-light: #EBE4D6;
+  --biscotti-dark: #C4B494;
+  --tawny: #8B7355;         /* Warm medium brown - like tawny owl feathers */
+  --tawny-light: #A69178;
+  --tawny-dark: #6B5A45;
+  --cinnamon: #6B4423;      /* True cinnamon bark - warm brown */
+  --cinnamon-light: #8B5A33;
+  --cinnamon-dark: #5A3A1D;
+  --chocolate: #3D2314;     /* Deep rich brown - like dark chocolate */
+  --chocolate-light: #4D3324;
+  --chocolate-dark: #2D1810;
+
+  /* Legacy brown scale mapped to named colors */
+  --brown-900: var(--chocolate-dark);
+  --brown-800: var(--chocolate);
+  --brown-700: var(--chocolate-light);
+  --brown-600: var(--cinnamon);
+  --brown-500: var(--cinnamon-light);
+  --brown-400: var(--tawny);
+  --brown-300: var(--tawny-light);
+  --brown-200: var(--biscotti);
+  --brown-100: var(--biscotti-light);
+  --brown-50: #F7F4EF;
+
+  /* Black mapped to chocolate */
+  --black: var(--chocolate);
+  --black-light: var(--chocolate-light);
 
   /* Grey mapped to warm brown-tinted greys */
-  --grey-900: #2C1810;
-  --grey-800: #3D2314;
-  --grey-700: #4D2E1A;
-  --grey-600: #6B4423;
-  --grey-500: #8B5A2B;
-  --grey-400: #A67B5B;
-  --grey-300: #C49A6C;
-  --grey-200: #D4B896;
-  --grey-100: #F5EBE0;
+  --grey-900: var(--chocolate-dark);
+  --grey-800: var(--chocolate);
+  --grey-700: var(--chocolate-light);
+  --grey-600: var(--cinnamon);
+  --grey-500: var(--cinnamon-light);
+  --grey-400: var(--tawny);
+  --grey-300: var(--tawny-light);
+  --grey-200: var(--biscotti);
+  --grey-100: var(--biscotti-light);
   --white: #ffffff;
 
   /* Status colors (subtle, brown-influenced) */
@@ -42,21 +57,21 @@
   --yellow-600: #8B7744;
   --yellow-500: #A69055;
   --yellow-100: #F5F0E8;
-  --orange-600: #8B5E44;
+  --orange-600: var(--cinnamon);
   --orange-100: #F5EBE8;
   --purple-600: #6B5A7A;
   --purple-100: #F0EBF5;
 
   /* Semantic Colors */
   --background: var(--white);
-  --foreground: var(--brown-900); /* dark brown text instead of black */
-  --primary: var(--brown-900);
-  --primary-hover: var(--brown-700);
-  --secondary: var(--brown-500);
-  --muted: var(--brown-100);
-  --muted-foreground: var(--brown-700);
-  --accent: var(--brown-700);
-  --border: var(--brown-300);
+  --foreground: var(--chocolate);
+  --primary: var(--chocolate);
+  --primary-hover: var(--cinnamon-dark);
+  --secondary: var(--tawny);
+  --muted: var(--biscotti-light);
+  --muted-foreground: var(--cinnamon-dark);
+  --accent: var(--cinnamon);
+  --border: var(--biscotti);
 }
 
 @theme inline {
@@ -70,42 +85,56 @@
   --color-accent: var(--accent);
   --color-border: var(--border);
 
-  /* Brand color palette - black mapped to dark brown */
-  --color-black: var(--brown-900);
-  --color-black-light: var(--brown-800);
-  --color-grey-900: var(--brown-900);
-  --color-grey-800: var(--brown-800);
-  --color-grey-700: var(--brown-700);
-  --color-grey-600: var(--brown-600);
-  --color-grey-500: var(--brown-500);
-  --color-grey-400: var(--brown-400);
-  --color-grey-300: var(--brown-300);
-  --color-grey-200: var(--brown-200);
-  --color-grey-100: var(--brown-100);
+  /* Named Brown Palette - Primary Brand Colors */
+  --color-biscotti: var(--biscotti);
+  --color-biscotti-light: var(--biscotti-light);
+  --color-biscotti-dark: var(--biscotti-dark);
+  --color-tawny: var(--tawny);
+  --color-tawny-light: var(--tawny-light);
+  --color-tawny-dark: var(--tawny-dark);
+  --color-cinnamon: var(--cinnamon);
+  --color-cinnamon-light: var(--cinnamon-light);
+  --color-cinnamon-dark: var(--cinnamon-dark);
+  --color-chocolate: var(--chocolate);
+  --color-chocolate-light: var(--chocolate-light);
+  --color-chocolate-dark: var(--chocolate-dark);
+
+  /* Brand color palette - black mapped to chocolate */
+  --color-black: var(--chocolate);
+  --color-black-light: var(--chocolate-light);
+  --color-grey-900: var(--chocolate-dark);
+  --color-grey-800: var(--chocolate);
+  --color-grey-700: var(--chocolate-light);
+  --color-grey-600: var(--cinnamon);
+  --color-grey-500: var(--cinnamon-light);
+  --color-grey-400: var(--tawny);
+  --color-grey-300: var(--tawny-light);
+  --color-grey-200: var(--biscotti);
+  --color-grey-100: var(--biscotti-light);
   --color-white: var(--white);
 
-  /* Brown palette */
-  --color-brown-900: var(--brown-900);
-  --color-brown-800: var(--brown-800);
-  --color-brown-700: var(--brown-700);
-  --color-brown-600: var(--brown-600);
-  --color-brown-500: var(--brown-500);
-  --color-brown-400: var(--brown-400);
-  --color-brown-300: var(--brown-300);
-  --color-brown-200: var(--brown-200);
-  --color-brown-100: var(--brown-100);
+  /* Brown palette (legacy) */
+  --color-brown-900: var(--chocolate-dark);
+  --color-brown-800: var(--chocolate);
+  --color-brown-700: var(--chocolate-light);
+  --color-brown-600: var(--cinnamon);
+  --color-brown-500: var(--cinnamon-light);
+  --color-brown-400: var(--tawny);
+  --color-brown-300: var(--tawny-light);
+  --color-brown-200: var(--biscotti);
+  --color-brown-100: var(--biscotti-light);
 
   /* Keep blue as brown for backwards compatibility */
-  --color-blue-900: var(--brown-900);
-  --color-blue-800: var(--brown-800);
-  --color-blue-700: var(--brown-700);
-  --color-blue-600: var(--brown-900);
-  --color-blue-500: var(--brown-700);
-  --color-blue-400: var(--brown-500);
-  --color-blue-300: var(--brown-300);
-  --color-blue-200: var(--brown-200);
-  --color-blue-100: var(--brown-100);
-  --color-blue-50: var(--brown-100);
+  --color-blue-900: var(--chocolate-dark);
+  --color-blue-800: var(--chocolate);
+  --color-blue-700: var(--chocolate-light);
+  --color-blue-600: var(--chocolate);
+  --color-blue-500: var(--cinnamon);
+  --color-blue-400: var(--tawny);
+  --color-blue-300: var(--biscotti);
+  --color-blue-200: var(--biscotti-light);
+  --color-blue-100: var(--biscotti-light);
+  --color-blue-50: #F7F4EF;
 
   /* Status colors */
   --color-green-600: var(--green-600);
@@ -128,14 +157,14 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* Dark mode - premium dark brown theme */
+/* Dark mode - premium dark chocolate theme */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #2C1810; /* dark chocolate brown */
-    --foreground: var(--brown-100); /* cream text */
-    --muted: var(--brown-800);
-    --muted-foreground: var(--brown-300);
-    --border: var(--brown-700);
+    --background: var(--chocolate);
+    --foreground: var(--biscotti-light);
+    --muted: var(--chocolate-light);
+    --muted-foreground: var(--biscotti);
+    --border: var(--cinnamon-dark);
   }
 }
 
@@ -267,4 +296,19 @@ main {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Hero CTA button - force brown text on white background */
+.hero-cta-white {
+  background-color: white !important;
+  color: #3D2314 !important;
+}
+
+.hero-cta-white * {
+  color: #3D2314 !important;
+}
+
+.hero-cta-white svg {
+  color: #3D2314 !important;
+  stroke: #3D2314 !important;
 }

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Menu, Bell, MessageSquare, CheckCircle, X, Dumbbell } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
+import ProfileAvatar from '@/components/ui/ProfileAvatar';
 
 interface Notification {
   id: string;
@@ -18,9 +19,11 @@ interface Notification {
 interface DashboardHeaderProps {
   onMenuClick: () => void;
   userName?: string;
+  userId?: string;
+  avatarUrl?: string | null;
 }
 
-export default function DashboardHeader({ onMenuClick, userName }: DashboardHeaderProps) {
+export default function DashboardHeader({ onMenuClick, userName, userId, avatarUrl }: DashboardHeaderProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -256,9 +259,14 @@ export default function DashboardHeader({ onMenuClick, userName }: DashboardHead
           </div>
 
           {/* User Avatar */}
-          <div className="w-10 h-10 bg-blue-600 flex items-center justify-center text-white font-bold">
-            {userName?.charAt(0).toUpperCase() || 'C'}
-          </div>
+          <Link href="/dashboard/settings" title="Profile Settings">
+            <ProfileAvatar
+              userId={userId}
+              avatarUrl={avatarUrl}
+              userName={userName}
+              size="md"
+            />
+          </Link>
         </div>
       </div>
     </header>

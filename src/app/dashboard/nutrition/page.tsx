@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -21,6 +21,15 @@ import {
   Clock,
   ChefHat,
   RefreshCw,
+  Plus,
+  Pencil,
+  Trash2,
+  UtensilsCrossed,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
+  Search,
+  Loader2,
 } from 'lucide-react';
 
 interface ClientData {
@@ -48,6 +57,34 @@ interface MealSuggestion {
   instructions: string;
   prep_time_minutes: number;
   meal_type: string;
+}
+
+interface FoodLog {
+  id: string;
+  client_id: string;
+  log_date: string;
+  food_name: string;
+  servings: number;
+  serving_size: string | null;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'other' | null;
+  notes: string | null;
+  logged_at: string;
+}
+
+interface FoodSearchResult {
+  id: string;
+  name: string;
+  brand?: string;
+  category?: string;
+  servingSize: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
 }
 
 // Macro calculation function
@@ -151,6 +188,14 @@ const activityLabels: Record<string, string> = {
   very_active: 'Very Active (athlete)',
 };
 
+const mealTypeLabels: Record<string, string> = {
+  breakfast: 'Breakfast',
+  lunch: 'Lunch',
+  dinner: 'Dinner',
+  snack: 'Snack',
+  other: 'Other',
+};
+
 const nutritionPrinciples = [
   {
     title: 'Protein Priority',
@@ -211,6 +256,7 @@ const mealTiming = [
 
 export default function NutritionPage() {
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
   const [clientData, setClientData] = useState<ClientData>({
     weight: null,
     bodyFatPercentage: null,
@@ -235,6 +281,30 @@ export default function NutritionPage() {
     dietaryPreferences: [] as string[],
   });
 
+  // Food logging state
+  const [foodLogs, setFoodLogs] = useState<FoodLog[]>([]);
+  const [showFoodModal, setShowFoodModal] = useState(false);
+  const [editingFood, setEditingFood] = useState<FoodLog | null>(null);
+  const [savingFood, setSavingFood] = useState(false);
+  const [newFood, setNewFood] = useState({
+    food_name: '',
+    servings: '1',
+    serving_size: '',
+    calories: '',
+    protein: '',
+    carbs: '',
+    fat: '',
+    meal_type: 'lunch' as 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'other',
+    notes: '',
+  });
+
+  // Food search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<FoodSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const dietaryOptions = [
     { value: 'vegetarian', label: 'Vegetarian' },
     { value: 'vegan', label: 'Vegan' },
@@ -246,9 +316,55 @@ export default function NutritionPage() {
     { value: 'paleo', label: 'Paleo' },
   ];
 
+  const today = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState(today);
+
+  const formatDateDisplay = (dateStr: string) => {
+    const date = new Date(dateStr + 'T00:00:00');
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0);
+    const selectedDateObj = new Date(dateStr + 'T00:00:00');
+
+    if (selectedDateObj.getTime() === todayDate.getTime()) {
+      return 'Today';
+    }
+
+    const yesterday = new Date(todayDate);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (selectedDateObj.getTime() === yesterday.getTime()) {
+      return 'Yesterday';
+    }
+
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const navigateDate = (direction: 'prev' | 'next') => {
+    const current = new Date(selectedDate + 'T00:00:00');
+    if (direction === 'prev') {
+      current.setDate(current.getDate() - 1);
+    } else {
+      current.setDate(current.getDate() + 1);
+    }
+    const newDate = current.toISOString().split('T')[0];
+    setSelectedDate(newDate);
+  };
+
+  const isToday = selectedDate === today;
+
   useEffect(() => {
     fetchClientData();
   }, []);
+
+  // Refetch food logs when date changes
+  useEffect(() => {
+    if (userId) {
+      fetchFoodLogs(userId, selectedDate);
+    }
+  }, [selectedDate, userId]);
 
   const fetchClientData = async () => {
     const supabase = createClient();
@@ -258,6 +374,8 @@ export default function NutritionPage() {
       setLoading(false);
       return;
     }
+
+    setUserId(user.id);
 
     // Fetch latest weight and body fat from measurements
     const { data: measurementData } = await supabase
@@ -293,7 +411,52 @@ export default function NutritionPage() {
       setMacros(calculatedMacros);
     }
 
+    // Fetch today's food logs
+    await fetchFoodLogs(user.id, today);
+
     setLoading(false);
+  };
+
+  const fetchFoodLogs = async (clientId: string, date: string) => {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('food_logs')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('log_date', date)
+      .order('logged_at', { ascending: true });
+
+    if (data) {
+      setFoodLogs(data);
+    }
+    if (error) {
+      console.error('Error fetching food logs:', error);
+    }
+  };
+
+  // Calculate consumed macros from food logs
+  const consumedMacros = foodLogs.reduce(
+    (acc, log) => ({
+      calories: acc.calories + (log.calories || 0),
+      protein: acc.protein + (log.protein || 0),
+      carbs: acc.carbs + (log.carbs || 0),
+      fat: acc.fat + (log.fat || 0),
+    }),
+    { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  );
+
+  // Calculate remaining macros
+  const remainingMacros = macros ? {
+    calories: Math.max(0, macros.calories - consumedMacros.calories),
+    protein: Math.max(0, macros.protein - consumedMacros.protein),
+    carbs: Math.max(0, macros.carbs - consumedMacros.carbs),
+    fat: Math.max(0, macros.fats - consumedMacros.fat),
+  } : null;
+
+  // Calculate percentages
+  const calculatePercentage = (consumed: number, target: number) => {
+    if (target === 0) return 0;
+    return Math.min(Math.round((consumed / target) * 100), 100);
   };
 
   const handleCalculate = () => {
@@ -356,6 +519,183 @@ export default function NutritionPage() {
     }));
   };
 
+  const resetFoodForm = () => {
+    setNewFood({
+      food_name: '',
+      servings: '1',
+      serving_size: '',
+      calories: '',
+      protein: '',
+      carbs: '',
+      fat: '',
+      meal_type: 'lunch',
+      notes: '',
+    });
+    setEditingFood(null);
+    setSearchQuery('');
+    setSearchResults([]);
+    setShowSearchResults(false);
+  };
+
+  // Debounced food search
+  const handleFoodSearch = (query: string) => {
+    setSearchQuery(query);
+    setNewFood({ ...newFood, food_name: query });
+
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (query.length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    setIsSearching(true);
+    setShowSearchResults(true);
+
+    // Debounce search
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/food-search?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        setSearchResults(data.results || []);
+      } catch (error) {
+        console.error('Food search error:', error);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  };
+
+  // Select a food from search results
+  const selectSearchResult = (food: FoodSearchResult) => {
+    setNewFood({
+      ...newFood,
+      food_name: food.name,
+      serving_size: food.servingSize,
+      calories: food.calories.toString(),
+      protein: food.protein.toString(),
+      carbs: food.carbs.toString(),
+      fat: food.fat.toString(),
+    });
+    setSearchQuery(food.name);
+    setShowSearchResults(false);
+    setSearchResults([]);
+  };
+
+  const openAddFoodModal = () => {
+    resetFoodForm();
+    setSearchQuery('');
+    setSearchResults([]);
+    setShowSearchResults(false);
+    setShowFoodModal(true);
+  };
+
+  const openEditFoodModal = (food: FoodLog) => {
+    setEditingFood(food);
+    setNewFood({
+      food_name: food.food_name,
+      servings: food.servings.toString(),
+      serving_size: food.serving_size || '',
+      calories: food.calories.toString(),
+      protein: food.protein.toString(),
+      carbs: food.carbs.toString(),
+      fat: food.fat.toString(),
+      meal_type: food.meal_type || 'lunch',
+      notes: food.notes || '',
+    });
+    setSearchQuery(food.food_name);
+    setSearchResults([]);
+    setShowSearchResults(false);
+    setShowFoodModal(true);
+  };
+
+  const handleSaveFood = async () => {
+    if (!userId || !newFood.food_name || !newFood.calories) return;
+
+    setSavingFood(true);
+    const supabase = createClient();
+
+    const foodData = {
+      client_id: userId,
+      log_date: selectedDate,
+      food_name: newFood.food_name,
+      servings: parseFloat(newFood.servings) || 1,
+      serving_size: newFood.serving_size || null,
+      calories: parseInt(newFood.calories) || 0,
+      protein: parseFloat(newFood.protein) || 0,
+      carbs: parseFloat(newFood.carbs) || 0,
+      fat: parseFloat(newFood.fat) || 0,
+      meal_type: newFood.meal_type,
+      notes: newFood.notes || null,
+    };
+
+    if (editingFood) {
+      // Update existing food log
+      const { error } = await supabase
+        .from('food_logs')
+        .update(foodData)
+        .eq('id', editingFood.id);
+
+      if (error) {
+        console.error('Error updating food log:', error);
+        alert('Failed to update food log');
+      } else {
+        await fetchFoodLogs(userId, selectedDate);
+        setShowFoodModal(false);
+        resetFoodForm();
+      }
+    } else {
+      // Insert new food log
+      const { error } = await supabase
+        .from('food_logs')
+        .insert(foodData);
+
+      if (error) {
+        console.error('Error adding food log:', error);
+        alert('Failed to add food log');
+      } else {
+        await fetchFoodLogs(userId, selectedDate);
+        setShowFoodModal(false);
+        resetFoodForm();
+      }
+    }
+
+    setSavingFood(false);
+  };
+
+  const handleDeleteFood = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this food entry?')) return;
+    if (!userId) return;
+
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('food_logs')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting food log:', error);
+      alert('Failed to delete food log');
+    } else {
+      setFoodLogs(foodLogs.filter(f => f.id !== id));
+    }
+  };
+
+  // Group food logs by meal type
+  const groupedFoodLogs = foodLogs.reduce((acc, log) => {
+    const mealType = log.meal_type || 'other';
+    if (!acc[mealType]) acc[mealType] = [];
+    acc[mealType].push(log);
+    return acc;
+  }, {} as Record<string, FoodLog[]>);
+
+  const mealTypeOrder = ['breakfast', 'lunch', 'dinner', 'snack', 'other'];
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -398,7 +738,7 @@ export default function NutritionPage() {
         </div>
       </div>
 
-      {/* Macro Calculator Results */}
+      {/* Macro Calculator Results with Progress Bars */}
       {macros ? (
         <Card className="border-2 border-blue-600">
           <CardContent className="p-6 bg-white">
@@ -431,33 +771,76 @@ export default function NutritionPage() {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {/* Calories */}
               <div className="text-center bg-orange-50 p-4 rounded-lg">
                 <div className="w-14 h-14 mx-auto bg-orange-600 rounded-full flex items-center justify-center mb-3">
                   <Flame className="h-7 w-7 text-white" />
                 </div>
-                <p className="text-3xl font-bold text-orange-600">{macros.calories}</p>
-                <p className="text-orange-700 text-sm font-medium">Calories</p>
+                <p className="text-2xl font-bold text-orange-600">{consumedMacros.calories}</p>
+                <p className="text-orange-700 text-sm">/ {macros.calories}</p>
+                <div className="mt-3 h-2 bg-orange-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-orange-600 transition-all duration-500"
+                    style={{ width: `${calculatePercentage(consumedMacros.calories, macros.calories)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-orange-700 mt-1 font-medium">
+                  {calculatePercentage(consumedMacros.calories, macros.calories)}% Calories
+                </p>
               </div>
+
+              {/* Protein */}
               <div className="text-center bg-red-50 p-4 rounded-lg">
                 <div className="w-14 h-14 mx-auto bg-red-600 rounded-full flex items-center justify-center mb-3">
                   <Beef className="h-7 w-7 text-white" />
                 </div>
-                <p className="text-3xl font-bold text-red-600">{macros.protein}g</p>
-                <p className="text-red-700 text-sm font-medium">Protein</p>
+                <p className="text-2xl font-bold text-red-600">{Math.round(consumedMacros.protein)}g</p>
+                <p className="text-red-700 text-sm">/ {macros.protein}g</p>
+                <div className="mt-3 h-2 bg-red-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-red-600 transition-all duration-500"
+                    style={{ width: `${calculatePercentage(consumedMacros.protein, macros.protein)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-red-700 mt-1 font-medium">
+                  {calculatePercentage(consumedMacros.protein, macros.protein)}% Protein
+                </p>
               </div>
+
+              {/* Carbs */}
               <div className="text-center bg-yellow-50 p-4 rounded-lg">
                 <div className="w-14 h-14 mx-auto bg-yellow-600 rounded-full flex items-center justify-center mb-3">
                   <Wheat className="h-7 w-7 text-white" />
                 </div>
-                <p className="text-3xl font-bold text-yellow-600">{macros.carbs}g</p>
-                <p className="text-yellow-700 text-sm font-medium">Carbs</p>
+                <p className="text-2xl font-bold text-yellow-600">{Math.round(consumedMacros.carbs)}g</p>
+                <p className="text-yellow-700 text-sm">/ {macros.carbs}g</p>
+                <div className="mt-3 h-2 bg-yellow-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-yellow-600 transition-all duration-500"
+                    style={{ width: `${calculatePercentage(consumedMacros.carbs, macros.carbs)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-yellow-700 mt-1 font-medium">
+                  {calculatePercentage(consumedMacros.carbs, macros.carbs)}% Carbs
+                </p>
               </div>
+
+              {/* Fats */}
               <div className="text-center bg-green-50 p-4 rounded-lg">
                 <div className="w-14 h-14 mx-auto bg-green-600 rounded-full flex items-center justify-center mb-3">
                   <Apple className="h-7 w-7 text-white" />
                 </div>
-                <p className="text-3xl font-bold text-green-600">{macros.fats}g</p>
-                <p className="text-green-700 text-sm font-medium">Fats</p>
+                <p className="text-2xl font-bold text-green-600">{Math.round(consumedMacros.fat)}g</p>
+                <p className="text-green-700 text-sm">/ {macros.fats}g</p>
+                <div className="mt-3 h-2 bg-green-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-green-600 transition-all duration-500"
+                    style={{ width: `${calculatePercentage(consumedMacros.fat, macros.fats)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-green-700 mt-1 font-medium">
+                  {calculatePercentage(consumedMacros.fat, macros.fats)}% Fats
+                </p>
               </div>
             </div>
 
@@ -495,6 +878,145 @@ export default function NutritionPage() {
               <Calculator className="mr-2 h-5 w-5" />
               Calculate Now
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Food Log Section */}
+      {macros && (
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-600 flex items-center justify-center">
+                  <UtensilsCrossed className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-black">Food Log</h2>
+                  <p className="text-sm text-grey-500">Track your daily meals</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Date Navigation */}
+                <div className="flex items-center gap-1 bg-grey-100 rounded-lg p-1">
+                  <button
+                    onClick={() => navigateDate('prev')}
+                    className="p-2 hover:bg-grey-200 rounded-lg transition-colors"
+                  >
+                    <ChevronLeft className="h-4 w-4 text-grey-600" />
+                  </button>
+                  <div className="flex items-center gap-2 px-3 py-1 min-w-[100px] justify-center">
+                    <Calendar className="h-4 w-4 text-grey-500" />
+                    <span className="text-sm font-medium text-black">{formatDateDisplay(selectedDate)}</span>
+                  </div>
+                  <button
+                    onClick={() => navigateDate('next')}
+                    disabled={isToday}
+                    className={`p-2 rounded-lg transition-colors ${
+                      isToday ? 'text-grey-300 cursor-not-allowed' : 'hover:bg-grey-200 text-grey-600'
+                    }`}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+                <Button onClick={openAddFoodModal} variant="primary">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Log Food
+                </Button>
+              </div>
+            </div>
+
+            {/* Remaining Macros Summary */}
+            {remainingMacros && (
+              <div className="bg-grey-50 p-4 mb-4 rounded-lg">
+                <p className="text-sm font-medium text-grey-700 mb-2">
+                  {isToday ? 'Remaining Today:' : `Remaining for ${formatDateDisplay(selectedDate)}:`}
+                </p>
+                <div className="flex flex-wrap gap-4 text-sm">
+                  <span className="text-orange-600 font-semibold">{remainingMacros.calories} cal</span>
+                  <span className="text-red-600 font-semibold">{Math.round(remainingMacros.protein)}g protein</span>
+                  <span className="text-yellow-600 font-semibold">{Math.round(remainingMacros.carbs)}g carbs</span>
+                  <span className="text-green-600 font-semibold">{Math.round(remainingMacros.fat)}g fat</span>
+                </div>
+              </div>
+            )}
+
+            {/* Food Log List */}
+            {foodLogs.length > 0 ? (
+              <div className="space-y-4">
+                {mealTypeOrder.map((mealType) => {
+                  const meals = groupedFoodLogs[mealType];
+                  if (!meals || meals.length === 0) return null;
+
+                  return (
+                    <div key={mealType}>
+                      <p className="text-xs font-semibold text-grey-500 uppercase tracking-wider mb-2">
+                        {mealTypeLabels[mealType]}
+                      </p>
+                      <div className="space-y-2">
+                        {meals.map((food) => (
+                          <div
+                            key={food.id}
+                            className="flex items-center justify-between p-3 bg-grey-50 rounded-lg group"
+                          >
+                            <div className="flex-1">
+                              <p className="font-medium text-black">
+                                {food.food_name}
+                                {food.serving_size && (
+                                  <span className="text-grey-500 text-sm ml-1">({food.serving_size})</span>
+                                )}
+                              </p>
+                              <p className="text-xs text-grey-500 mt-0.5">
+                                P: {food.protein}g · C: {food.carbs}g · F: {food.fat}g
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-semibold text-black">{food.calories} cal</span>
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => openEditFoodModal(food)}
+                                  className="p-1 text-grey-400 hover:text-blue-600"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteFood(food.id)}
+                                  className="p-1 text-grey-400 hover:text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Daily Total */}
+                <div className="pt-4 border-t border-grey-200">
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold text-black">Total Today</p>
+                    <p className="text-sm text-grey-600">
+                      <span className="font-semibold text-black">{consumedMacros.calories} cal</span>
+                      {' · '}P: {Math.round(consumedMacros.protein)}g
+                      {' · '}C: {Math.round(consumedMacros.carbs)}g
+                      {' · '}F: {Math.round(consumedMacros.fat)}g
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-grey-50 rounded-lg">
+                <UtensilsCrossed className="h-10 w-10 mx-auto text-grey-300 mb-3" />
+                <p className="text-grey-600 text-sm">
+                  {isToday
+                    ? 'No foods logged yet today. Click "Log Food" to start tracking.'
+                    : `No foods logged for ${formatDateDisplay(selectedDate)}.`}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -650,7 +1172,7 @@ export default function NutritionPage() {
               <div className="text-center py-8 bg-grey-50">
                 <ChefHat className="h-10 w-10 mx-auto text-grey-300 mb-3" />
                 <p className="text-grey-600 text-sm">
-                  Click &quot;Get Suggestions&quot; to receive AI-powered meal ideas tailored to your macro targets.
+                  Click &quot;Generate&quot; to receive AI-powered meal ideas tailored to your macro targets.
                 </p>
               </div>
             )}
@@ -714,7 +1236,7 @@ export default function NutritionPage() {
           <div className="p-4 bg-grey-50">
             <p className="font-medium text-black">Track Your Food</p>
             <p className="text-sm text-grey-600 mt-1">
-              Consider using an app like MyFitnessPal to track intake and build awareness.
+              Use the food log above to track intake and build awareness of your eating habits.
             </p>
           </div>
           <div className="p-4 bg-grey-50">
@@ -852,7 +1374,7 @@ export default function NutritionPage() {
                     {['all', 'breakfast', 'lunch', 'dinner', 'snack'].map((type) => (
                       <button
                         key={type}
-                        onClick={() => setMealOptions(prev => ({ ...prev, mealType: type as any }))}
+                        onClick={() => setMealOptions(prev => ({ ...prev, mealType: type as 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'all' }))}
                         className={`px-3 py-2 text-sm font-medium capitalize transition-colors ${
                           mealOptions.mealType === type
                             ? 'bg-purple-600 text-white'
@@ -932,6 +1454,251 @@ export default function NutritionPage() {
                 >
                   <Sparkles className="h-4 w-4 mr-2" />
                   Generate Meals
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Food Modal */}
+      {showFoodModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-black">
+                  {editingFood ? 'Edit Food Entry' : 'Log Food'}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowFoodModal(false);
+                    resetFoodForm();
+                  }}
+                  className="text-grey-400 hover:text-black"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Food Search */}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-black mb-2">
+                    Search Food *
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-grey-400" />
+                    <input
+                      type="text"
+                      value={searchQuery || newFood.food_name}
+                      onChange={(e) => handleFoodSearch(e.target.value)}
+                      onFocus={() => searchQuery.length >= 2 && setShowSearchResults(true)}
+                      placeholder="Search for a food (e.g., chicken breast, rice)..."
+                      className="w-full border border-grey-300 pl-10 pr-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                    />
+                    {isSearching && (
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-grey-400 animate-spin" />
+                    )}
+                  </div>
+
+                  {/* Search Results Dropdown */}
+                  {showSearchResults && (searchResults.length > 0 || isSearching) && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-grey-300 shadow-lg max-h-60 overflow-y-auto">
+                      {isSearching && searchResults.length === 0 ? (
+                        <div className="p-4 text-center text-grey-500">
+                          <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                          Searching foods...
+                        </div>
+                      ) : (
+                        searchResults.map((food) => (
+                          <button
+                            key={food.id}
+                            type="button"
+                            onClick={() => selectSearchResult(food)}
+                            className="w-full p-3 text-left hover:bg-blue-50 border-b border-grey-100 last:border-b-0 transition-colors"
+                          >
+                            <div className="flex justify-between items-start gap-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-black truncate">{food.name}</p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  {food.brand && (
+                                    <span className="text-xs text-blue-600 font-medium">{food.brand}</span>
+                                  )}
+                                  {food.brand && food.category && food.category !== 'Restaurant' && (
+                                    <span className="text-grey-300">•</span>
+                                  )}
+                                  {food.category && food.category !== food.brand && (
+                                    <span className="text-xs text-grey-500">{food.category}</span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-grey-400 mt-0.5">{food.servingSize}</p>
+                              </div>
+                              <div className="text-right text-xs flex-shrink-0">
+                                <p className="font-bold text-black">{food.calories} cal</p>
+                                <p className="text-grey-500 whitespace-nowrap">
+                                  P:{food.protein}g C:{food.carbs}g F:{food.fat}g
+                                </p>
+                              </div>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                      {!isSearching && searchResults.length === 0 && searchQuery.length >= 2 && (
+                        <div className="p-4 text-center text-grey-500">
+                          No foods found. Enter details manually below.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Click outside to close */}
+                  {showSearchResults && (
+                    <div
+                      className="fixed inset-0 z-0"
+                      onClick={() => setShowSearchResults(false)}
+                    />
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">
+                      Servings
+                    </label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0.5"
+                      value={newFood.servings}
+                      onChange={(e) => setNewFood({ ...newFood, servings: e.target.value })}
+                      placeholder="1"
+                      className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">
+                      Serving Size
+                    </label>
+                    <input
+                      type="text"
+                      value={newFood.serving_size}
+                      onChange={(e) => setNewFood({ ...newFood, serving_size: e.target.value })}
+                      placeholder="e.g., 4 oz"
+                      className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-black mb-2">
+                    Calories *
+                  </label>
+                  <input
+                    type="number"
+                    value={newFood.calories}
+                    onChange={(e) => setNewFood({ ...newFood, calories: e.target.value })}
+                    placeholder="e.g., 165"
+                    className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">
+                      Protein (g)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={newFood.protein}
+                      onChange={(e) => setNewFood({ ...newFood, protein: e.target.value })}
+                      placeholder="31"
+                      className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">
+                      Carbs (g)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={newFood.carbs}
+                      onChange={(e) => setNewFood({ ...newFood, carbs: e.target.value })}
+                      placeholder="0"
+                      className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">
+                      Fat (g)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={newFood.fat}
+                      onChange={(e) => setNewFood({ ...newFood, fat: e.target.value })}
+                      placeholder="3.6"
+                      className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-black mb-2">
+                    Meal Type
+                  </label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {(['breakfast', 'lunch', 'dinner', 'snack', 'other'] as const).map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setNewFood({ ...newFood, meal_type: type })}
+                        className={`px-2 py-2 text-xs font-medium capitalize transition-colors ${
+                          newFood.meal_type === type
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-grey-100 text-grey-700 hover:bg-grey-200'
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-black mb-2">
+                    Notes (optional)
+                  </label>
+                  <textarea
+                    value={newFood.notes}
+                    onChange={(e) => setNewFood({ ...newFood, notes: e.target.value })}
+                    placeholder="Any additional notes..."
+                    rows={2}
+                    className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600 resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <Button
+                  onClick={() => {
+                    setShowFoodModal(false);
+                    resetFoodForm();
+                  }}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveFood}
+                  variant="primary"
+                  className="flex-1"
+                  disabled={!newFood.food_name || !newFood.calories || savingFood}
+                >
+                  {savingFood ? 'Saving...' : editingFood ? 'Update' : 'Log Food'}
                 </Button>
               </div>
             </div>

@@ -12,6 +12,8 @@ export default function DashboardLayout({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userName, setUserName] = useState<string>('');
+  const [userId, setUserId] = useState<string>('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -19,9 +21,10 @@ export default function DashboardLayout({
       const { data: { user } } = await supabase.auth.getUser();
 
       if (user) {
+        setUserId(user.id);
         const { data: profile } = await supabase
           .from('profiles')
-          .select('full_name')
+          .select('full_name, avatar_url')
           .eq('id', user.id)
           .single();
 
@@ -29,6 +32,10 @@ export default function DashboardLayout({
           setUserName(profile.full_name);
         } else if (user.user_metadata?.full_name) {
           setUserName(user.user_metadata.full_name);
+        }
+
+        if (profile?.avatar_url) {
+          setAvatarUrl(profile.avatar_url);
         }
       }
     };
@@ -46,6 +53,8 @@ export default function DashboardLayout({
         <DashboardHeader
           onMenuClick={() => setSidebarOpen(true)}
           userName={userName}
+          userId={userId}
+          avatarUrl={avatarUrl}
         />
         <main className="flex-1 p-4 lg:p-6">
           {children}

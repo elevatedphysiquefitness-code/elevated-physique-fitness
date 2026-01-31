@@ -13,7 +13,7 @@ const inPersonPlans = [
     id: 'unlimited',
     name: 'Unlimited',
     description: '5 sessions/week',
-    price: 720,
+    price: 900,
     period: 'month',
     popular: true,
     features: [
@@ -26,7 +26,7 @@ const inPersonPlans = [
     id: 'elevated-physique',
     name: 'Elevated Physique',
     description: '4 sessions/week',
-    price: 520,
+    price: 720,
     period: 'month',
     popular: false,
     features: [
@@ -39,7 +39,7 @@ const inPersonPlans = [
     id: 'physique',
     name: 'Physique',
     description: '3 sessions/week',
-    price: 420,
+    price: 540,
     period: 'month',
     popular: false,
     features: [
@@ -52,7 +52,7 @@ const inPersonPlans = [
     id: 'elevated',
     name: 'Elevated',
     description: '2 sessions/week',
-    price: 320,
+    price: 360,
     period: 'month',
     popular: false,
     features: [
@@ -68,7 +68,7 @@ const onlinePlans = [
     id: 'unlimited',
     name: 'Unlimited',
     description: '5 days/week programming',
-    price: 360,
+    price: 700,
     period: 'month',
     popular: true,
     features: [
@@ -81,7 +81,7 @@ const onlinePlans = [
     id: 'elevated-physique',
     name: 'Elevated Physique',
     description: '4 days/week programming',
-    price: 260,
+    price: 560,
     period: 'month',
     popular: false,
     features: [
@@ -94,7 +94,7 @@ const onlinePlans = [
     id: 'physique',
     name: 'Physique',
     description: '3 days/week programming',
-    price: 210,
+    price: 420,
     period: 'month',
     popular: false,
     features: [
@@ -107,7 +107,7 @@ const onlinePlans = [
     id: 'elevated',
     name: 'Elevated',
     description: '2 days/week programming',
-    price: 150,
+    price: 280,
     period: 'month',
     popular: false,
     features: [
@@ -130,9 +130,9 @@ interface Plan {
 
 function PricingCard({ plan, type }: { plan: Plan; type: 'inperson' | 'online' }) {
   return (
-    <div className={`bg-white p-6 flex flex-col h-full ${plan.popular ? 'ring-2 ring-blue-600' : 'border border-grey-200'}`}>
+    <div className={`bg-white p-6 flex flex-col h-full ${plan.popular ? 'ring-2 ring-[#3D2314]' : 'border border-grey-200'}`}>
       {plan.popular && (
-        <div className="bg-blue-600 text-white text-xs font-semibold px-3 py-1 inline-block mb-3 self-start">
+        <div className="bg-[#3D2314] text-white text-xs font-semibold px-3 py-1 inline-block mb-3 self-start">
           MOST POPULAR
         </div>
       )}
@@ -147,7 +147,7 @@ function PricingCard({ plan, type }: { plan: Plan; type: 'inperson' | 'online' }
       <ul className="mt-6 space-y-3 flex-1">
         {plan.features.map((feature) => (
           <li key={feature} className="flex items-start gap-2">
-            <Check className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <Check className="h-5 w-5 text-[#3D2314] flex-shrink-0 mt-0.5" />
             <span className="text-grey-700 text-sm">{feature}</span>
           </li>
         ))}
@@ -171,17 +171,17 @@ export default function PricingPage() {
   return (
     <>
       {/* Hero Section */}
-      <section className="py-24 bg-black text-white">
+      <section className="py-24 bg-[#3D2314] text-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
-            <p className="text-blue-500 text-sm font-semibold uppercase tracking-widest mb-6">
+            <p className="text-[#D4C4A8] text-sm font-semibold uppercase tracking-widest mb-6">
               Pricing
             </p>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight">
               Transparent Pricing.
-              <span className="block text-blue-500">Real Value.</span>
+              <span className="block text-[#D4C4A8]">Real Value.</span>
             </h1>
-            <p className="mt-8 text-xl text-grey-300 leading-relaxed">
+            <p className="mt-8 text-xl text-[#EBE4D6] leading-relaxed">
               Invest in coaching that delivers results. Choose the plan that fits your
               goals and schedule.
             </p>
@@ -193,8 +193,8 @@ export default function PricingPage() {
       <section id="in-person" className="py-24 bg-grey-100">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 mb-4">
-            <MapPin className="h-6 w-6 text-blue-600" />
-            <p className="text-blue-600 text-sm font-semibold uppercase tracking-widest">
+            <MapPin className="h-6 w-6 text-[#3D2314]" />
+            <p className="text-[#3D2314] text-sm font-semibold uppercase tracking-widest">
               Houston, TX
             </p>
           </div>
@@ -218,8 +218,8 @@ export default function PricingPage() {
       <section id="online" className="py-24 bg-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 mb-4">
-            <Laptop className="h-6 w-6 text-blue-600" />
-            <p className="text-blue-600 text-sm font-semibold uppercase tracking-widest">
+            <Laptop className="h-6 w-6 text-[#3D2314]" />
+            <p className="text-[#3D2314] text-sm font-semibold uppercase tracking-widest">
               Train Anywhere
             </p>
           </div>
@@ -236,6 +236,55 @@ export default function PricingPage() {
               <PricingCard key={plan.id} plan={plan} type="online" />
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Membership Commitment Tiers */}
+      <section className="py-16 bg-[#EBE4D6]">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-[#3D2314]">Commitment Options</h2>
+            <p className="mt-4 text-[#6B4423] max-w-2xl mx-auto">
+              Choose the commitment length that works for your goals. Longer commitments come with added benefits.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            <div className="bg-white p-6 text-center border-2 border-grey-200 hover:border-[#8B7355] transition-colors">
+              <h3 className="text-xl font-bold text-[#3D2314]">3-Month</h3>
+              <p className="text-grey-500 text-sm mt-1">Minimum Commitment</p>
+              <div className="mt-4 py-3 border-t border-grey-100">
+                <p className="text-grey-600 text-sm">Standard monthly rate</p>
+                <p className="text-grey-600 text-sm mt-2">Perfect for getting started</p>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 text-center border-2 border-[#3D2314] relative">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#3D2314] text-white text-xs font-semibold px-3 py-1">
+                BEST VALUE
+              </div>
+              <h3 className="text-xl font-bold text-[#3D2314]">6-Month</h3>
+              <p className="text-grey-500 text-sm mt-1">Recommended</p>
+              <div className="mt-4 py-3 border-t border-grey-100">
+                <p className="text-[#3D2314] font-semibold text-sm">5% discount on monthly rate</p>
+                <p className="text-grey-600 text-sm mt-2">Ideal for real transformation</p>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 text-center border-2 border-grey-200 hover:border-[#8B7355] transition-colors">
+              <h3 className="text-xl font-bold text-[#3D2314]">1-Year</h3>
+              <p className="text-grey-500 text-sm mt-1">Maximum Savings</p>
+              <div className="mt-4 py-3 border-t border-grey-100">
+                <p className="text-[#3D2314] font-semibold text-sm">10% discount on monthly rate</p>
+                <p className="text-grey-600 text-sm mt-2">For serious long-term results</p>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-center text-sm text-[#6B4423] mt-8">
+            Commitment details and terms are outlined in our{' '}
+            <a href="/policies" className="text-[#3D2314] underline hover:text-[#4D3324]">Policies page</a>.
+          </p>
         </div>
       </section>
 
@@ -258,7 +307,7 @@ export default function PricingPage() {
               'Program adjustments as you progress',
             ].map((item) => (
               <div key={item} className="bg-white p-6 flex items-center gap-4">
-                <div className="w-3 h-3 bg-blue-600 flex-shrink-0" />
+                <div className="w-3 h-3 bg-[#3D2314] flex-shrink-0" />
                 <span className="text-grey-700 font-medium">{item}</span>
               </div>
             ))}
@@ -273,17 +322,56 @@ export default function PricingPage() {
         </div>
       </section>
 
+      {/* Membership Commitment & Cancellation */}
+      <section className="py-16 bg-white border-t border-grey-200">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl mx-auto">
+            <h2 className="text-2xl font-bold text-black text-center mb-8">
+              Membership Commitment & Cancellation
+            </h2>
+
+            <div className="space-y-6">
+              <div className="bg-grey-50 p-6 border-l-4 border-[#3D2314]">
+                <h3 className="font-semibold text-black mb-2">Minimum Commitment</h3>
+                <p className="text-grey-600 text-sm">
+                  All coaching memberships require a minimum commitment period. This ensures we have adequate time to design your program,
+                  establish habits, and deliver meaningful results. Commitment details vary by membership tier—see our{' '}
+                  <a href="/policies" className="text-[#3D2314] underline hover:text-[#6B4423]">Policies page</a> for full terms.
+                </p>
+              </div>
+
+              <div className="bg-grey-50 p-6 border-l-4 border-[#6B4423]">
+                <h3 className="font-semibold text-black mb-2">Cancellation Policy</h3>
+                <p className="text-grey-600 text-sm">
+                  We understand life changes. Cancellations must be submitted in writing at least 14 days before your next billing date.
+                  Early termination fees may apply if canceling before your minimum commitment period ends.
+                  See our <a href="/policies" className="text-[#3D2314] underline hover:text-[#6B4423]">Policies page</a> for complete details.
+                </p>
+              </div>
+
+              <div className="bg-grey-50 p-6 border-l-4 border-[#8B7355]">
+                <h3 className="font-semibold text-black mb-2">Pause Option</h3>
+                <p className="text-grey-600 text-sm">
+                  Need to take a break? Active members can pause their membership for up to 30 days once per year at no additional cost.
+                  Contact your coach to arrange a pause.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Welcome Gift Section */}
-      <section className="py-24 bg-white">
+      <section className="py-24 bg-[#EBE4D6]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl mx-auto text-center">
-            <div className="w-16 h-16 bg-blue-600 mx-auto mb-6 flex items-center justify-center">
+            <div className="w-16 h-16 bg-[#3D2314] mx-auto mb-6 flex items-center justify-center">
               <Gift className="h-8 w-8 text-white" />
             </div>
-            <h2 className="text-3xl sm:text-4xl font-bold text-black">
+            <h2 className="text-3xl sm:text-4xl font-bold text-[#3D2314]">
               Elevated Physique Welcome Gift
             </h2>
-            <p className="mt-4 text-grey-600">
+            <p className="mt-4 text-[#6B4423]">
               Every new client receives a welcome package to kickstart their fitness journey
             </p>
 
@@ -294,9 +382,9 @@ export default function PricingPage() {
                 { name: 'Welcome Note', description: 'Personalized welcome from your coach' },
                 { name: 'Nutrition Guide', description: 'Foundational nutrition & meal guide' },
               ].map((item) => (
-                <div key={item.name} className="bg-grey-100 p-6 text-center">
-                  <div className="w-3 h-3 bg-blue-600 mx-auto mb-4" />
-                  <h3 className="font-bold text-black">{item.name}</h3>
+                <div key={item.name} className="bg-white p-6 text-center">
+                  <div className="w-3 h-3 bg-[#3D2314] mx-auto mb-4" />
+                  <h3 className="font-bold text-[#3D2314]">{item.name}</h3>
                   <p className="mt-2 text-sm text-grey-600">{item.description}</p>
                 </div>
               ))}
@@ -306,18 +394,21 @@ export default function PricingPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-24 bg-black text-white">
+      <section className="py-24 bg-[#3D2314] text-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl sm:text-4xl font-bold">Ready to Invest in Yourself?</h2>
-          <p className="mt-6 text-grey-400 max-w-2xl mx-auto">
+          <p className="mt-6 text-[#D4C4A8] max-w-2xl mx-auto">
             Not sure which plan is right for you? Apply today and let&apos;s discuss
             which plan is the best fit for your goals, schedule, and experience level.
           </p>
           <div className="mt-10">
-            <Button href="/apply" size="lg" variant="primary">
+            <a
+              href="/apply"
+              className="hero-cta-white inline-flex items-center justify-center px-8 py-4 font-semibold text-base"
+            >
               Apply for Coaching
               <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
+            </a>
           </div>
         </div>
       </section>

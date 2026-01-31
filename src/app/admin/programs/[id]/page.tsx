@@ -793,7 +793,7 @@ export default function ProgramDetailPage() {
                   client{assignedClients !== 1 ? 's' : ''} using this program
                 </p>
               </div>
-              <Button href="/admin/clients" variant="outline" className="w-full mt-4">
+              <Button href={`/admin/clients?program=${programId}&programName=${encodeURIComponent(formData.title)}`} variant="outline" className="w-full mt-4">
                 View Clients
               </Button>
             </CardContent>

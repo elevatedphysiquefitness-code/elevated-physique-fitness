@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState } from 'react';
 import { Menu, X, ChevronDown } from 'lucide-react';
 
@@ -9,6 +10,7 @@ const navigation = [
   { name: 'About', href: '/about' },
   { name: 'Services', href: '/services' },
   { name: 'Pricing', href: '/pricing' },
+  { name: 'Policies', href: '/policies' },
   { name: 'FAQ', href: '/faq' },
   { name: 'Contact', href: '/contact' },
 ];
@@ -21,7 +23,14 @@ export default function Header() {
       <nav className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-20 items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2">
+          <Link href="/" className="flex items-center space-x-3">
+            <Image
+              src="/logo.png"
+              alt="Elevated Physique"
+              width={40}
+              height={40}
+              className="h-10 w-auto"
+            />
             <span className="text-xl font-bold tracking-tight text-black uppercase">
               Elevated Physique
             </span>
@@ -40,17 +49,17 @@ export default function Header() {
             ))}
           </div>
 
-          {/* CTA Button */}
+          {/* CTA Buttons */}
           <div className="hidden lg:flex lg:items-center lg:space-x-4">
             <Link
-              href="/dashboard"
-              className="text-sm font-medium text-grey-700 hover:text-blue-600 transition-colors"
+              href="/login"
+              className="text-sm font-medium text-grey-700 hover:text-[#3D2314] transition-colors border border-grey-300 px-4 py-2 hover:border-[#3D2314]"
             >
-              Client Portal
+              Client Login
             </Link>
             <Link
               href="/apply"
-              className="bg-blue-600 text-white px-6 py-2.5 text-sm font-semibold hover:bg-blue-700 transition-colors duration-200"
+              className="bg-[#3D2314] text-white px-6 py-2.5 text-sm font-semibold hover:bg-[#4D3324] transition-colors duration-200"
             >
               Apply for Coaching
             </Link>
@@ -84,17 +93,17 @@ export default function Header() {
                   {item.name}
                 </Link>
               ))}
-              <div className="pt-4 border-t border-grey-200 space-y-4">
+              <div className="pt-4 border-t border-grey-200 space-y-3">
                 <Link
-                  href="/dashboard"
-                  className="block text-base font-medium text-grey-700 hover:text-blue-600"
+                  href="/login"
+                  className="block bg-white text-[#3D2314] border-2 border-[#3D2314] px-6 py-3 text-center font-semibold hover:bg-[#EBE4D6] transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Client Portal
+                  Client Login
                 </Link>
                 <Link
                   href="/apply"
-                  className="block bg-blue-600 text-white px-6 py-3 text-center font-semibold hover:bg-blue-700 transition-colors"
+                  className="block bg-[#3D2314] text-white px-6 py-3 text-center font-semibold hover:bg-[#4D3324] transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Apply for Coaching

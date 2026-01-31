@@ -16,6 +16,11 @@ import {
   Camera,
   FileText,
   ClipboardCheck,
+  Droplets,
+  Plus,
+  Minus,
+  Moon,
+  Star,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 
@@ -58,6 +63,13 @@ export default function DashboardPage() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState('');
+  const [waterIntake, setWaterIntake] = useState(0);
+  const [waterGoal, setWaterGoal] = useState(64); // Default 64oz
+  const [userId, setUserId] = useState<string | null>(null);
+  const [sleepHours, setSleepHours] = useState<number | null>(null);
+  const [sleepQuality, setSleepQuality] = useState<number | null>(null);
+  const [showSleepModal, setShowSleepModal] = useState(false);
+  const [sleepInput, setSleepInput] = useState({ hours: '', quality: 3 });
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -77,6 +89,46 @@ export default function DashboardPage() {
         .single();
 
       setUserName(profile?.full_name || user.email?.split('@')[0] || 'there');
+      setUserId(user.id);
+
+      // Fetch today's water intake
+      const today = new Date().toISOString().split('T')[0];
+      const { data: waterData } = await supabase
+        .from('water_logs')
+        .select('amount_oz')
+        .eq('client_id', user.id)
+        .eq('log_date', today);
+
+      if (waterData) {
+        const totalWater = waterData.reduce((sum, log) => sum + (log.amount_oz || 0), 0);
+        setWaterIntake(totalWater);
+      }
+
+      // Get weight for water goal calculation (half bodyweight in oz)
+      const { data: measurementData } = await supabase
+        .from('measurements')
+        .select('weight')
+        .eq('client_id', user.id)
+        .order('measurement_date', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (measurementData?.weight) {
+        setWaterGoal(Math.round(measurementData.weight / 2));
+      }
+
+      // Fetch today's sleep log
+      const { data: sleepData } = await supabase
+        .from('sleep_logs')
+        .select('hours_slept, sleep_quality')
+        .eq('client_id', user.id)
+        .eq('log_date', today)
+        .single();
+
+      if (sleepData) {
+        setSleepHours(sleepData.hours_slept);
+        setSleepQuality(sleepData.sleep_quality);
+      }
 
       // Fetch stats from API
       try {
@@ -90,7 +142,6 @@ export default function DashboardPage() {
       }
 
       // Fetch today's habits
-      const today = new Date().toISOString().split('T')[0];
       const { data: userHabits } = await supabase
         .from('habits')
         .select(`
@@ -165,6 +216,76 @@ export default function DashboardPage() {
     }));
   };
 
+  const addWater = async (amount: number) => {
+    if (!userId) return;
+
+    const supabase = createClient();
+    const today = new Date().toISOString().split('T')[0];
+
+    // Don't go below 0
+    if (waterIntake + amount < 0) return;
+
+    if (amount > 0) {
+      // Add water log
+      await supabase.from('water_logs').insert({
+        client_id: userId,
+        log_date: today,
+        amount_oz: amount,
+      });
+    } else {
+      // Remove last water log entry for negative amounts
+      const { data: logs } = await supabase
+        .from('water_logs')
+        .select('id, amount_oz')
+        .eq('client_id', userId)
+        .eq('log_date', today)
+        .order('logged_at', { ascending: false })
+        .limit(1);
+
+      if (logs && logs.length > 0) {
+        await supabase.from('water_logs').delete().eq('id', logs[0].id);
+      }
+    }
+
+    setWaterIntake(prev => Math.max(0, prev + amount));
+  };
+
+  const logSleep = async () => {
+    if (!userId || !sleepInput.hours) return;
+
+    const supabase = createClient();
+    const today = new Date().toISOString().split('T')[0];
+    const hours = parseFloat(sleepInput.hours);
+
+    await supabase
+      .from('sleep_logs')
+      .upsert({
+        client_id: userId,
+        log_date: today,
+        hours_slept: hours,
+        sleep_quality: sleepInput.quality,
+      }, {
+        onConflict: 'client_id,log_date'
+      });
+
+    setSleepHours(hours);
+    setSleepQuality(sleepInput.quality);
+    setShowSleepModal(false);
+    setSleepInput({ hours: '', quality: 3 });
+  };
+
+  const getSleepQualityLabel = (quality: number) => {
+    const labels = ['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent'];
+    return labels[quality] || '';
+  };
+
+  const getSleepQualityColor = (quality: number) => {
+    const colors = ['', 'text-red-600', 'text-orange-600', 'text-yellow-600', 'text-green-600', 'text-emerald-600'];
+    return colors[quality] || 'text-grey-600';
+  };
+
+  const waterPercentage = Math.min(Math.round((waterIntake / waterGoal) * 100), 100);
+
   const quickActions = [
     {
       title: "Today's Workout",
@@ -207,9 +328,18 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Welcome Message */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 rounded-lg">
-        <h1 className="text-2xl font-bold">Welcome back, {userName}!</h1>
-        <p className="text-blue-100 mt-1">Here&apos;s your progress overview</p>
+      <div className="bg-gradient-to-r from-cinnamon to-chocolate text-white p-6 rounded-lg relative overflow-hidden">
+        {/* EP Pattern */}
+        <div
+          className="absolute inset-0 opacity-[0.06]"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='10' y='40' font-family='Arial, sans-serif' font-size='28' font-weight='bold' fill='%23ffffff'%3EEP%3C/text%3E%3Ctext x='60' y='80' font-family='Arial, sans-serif' font-size='28' font-weight='bold' fill='%23ffffff'%3EEP%3C/text%3E%3C/svg%3E")`,
+          }}
+        />
+        <div className="relative z-10">
+          <h1 className="text-2xl font-bold">Welcome back, {userName}!</h1>
+          <p className="text-biscotti mt-1">Here&apos;s your progress overview</p>
+        </div>
       </div>
 
       {/* Progress Stats Overview */}
@@ -333,6 +463,211 @@ export default function DashboardPage() {
           </Link>
         ))}
       </div>
+
+      {/* Water Tracker */}
+      <div className="bg-white p-6 rounded-lg shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+              <Droplets className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="font-bold text-black">Water Intake</h2>
+              <p className="text-sm text-grey-500">{waterIntake} / {waterGoal} oz</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => addWater(-8)}
+              disabled={waterIntake === 0}
+              className="w-10 h-10 rounded-full bg-grey-100 flex items-center justify-center text-grey-600 hover:bg-grey-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Minus className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => addWater(8)}
+              className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+        <div className="h-4 bg-grey-100 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-blue-600 rounded-full transition-all duration-500"
+            style={{ width: `${waterPercentage}%` }}
+          />
+        </div>
+        <div className="flex justify-between mt-2 text-xs text-grey-500">
+          <span>{waterPercentage}% of daily goal</span>
+          <span>{Math.max(0, waterGoal - waterIntake)} oz remaining</span>
+        </div>
+        <div className="flex gap-2 mt-4">
+          {[8, 16, 32].map((oz) => (
+            <button
+              key={oz}
+              onClick={() => addWater(oz)}
+              className="flex-1 py-2 text-sm font-medium bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+            >
+              +{oz}oz
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Sleep Tracker */}
+      <div className="bg-white p-6 rounded-lg shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+              <Moon className="h-5 w-5 text-indigo-600" />
+            </div>
+            <div>
+              <h2 className="font-bold text-black">Sleep Tracker</h2>
+              <p className="text-sm text-grey-500">
+                {sleepHours !== null
+                  ? `${sleepHours}h last night`
+                  : "Log last night's sleep"}
+              </p>
+            </div>
+          </div>
+          {sleepHours === null ? (
+            <button
+              onClick={() => setShowSleepModal(true)}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium text-sm"
+            >
+              Log Sleep
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowSleepModal(true)}
+              className="px-4 py-2 bg-grey-100 text-grey-600 rounded-lg hover:bg-grey-200 transition-colors font-medium text-sm"
+            >
+              Update
+            </button>
+          )}
+        </div>
+
+        {sleepHours !== null && (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-indigo-50 p-4 rounded-lg">
+              <p className="text-xs text-grey-500 uppercase mb-1">Hours Slept</p>
+              <p className="text-2xl font-bold text-indigo-600">{sleepHours}h</p>
+              <p className="text-xs text-grey-500 mt-1">
+                {sleepHours >= 7 ? '✓ Good amount!' : 'Try for 7-9 hours'}
+              </p>
+            </div>
+            <div className="bg-indigo-50 p-4 rounded-lg">
+              <p className="text-xs text-grey-500 uppercase mb-1">Quality</p>
+              <p className={`text-2xl font-bold ${getSleepQualityColor(sleepQuality || 0)}`}>
+                {getSleepQualityLabel(sleepQuality || 0)}
+              </p>
+              <div className="flex gap-0.5 mt-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star
+                    key={star}
+                    className={`h-4 w-4 ${
+                      star <= (sleepQuality || 0)
+                        ? 'text-yellow-500 fill-yellow-500'
+                        : 'text-grey-300'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {sleepHours === null && (
+          <div className="bg-indigo-50 p-4 rounded-lg text-center">
+            <p className="text-grey-600 text-sm">
+              Track your sleep to optimize recovery and performance.
+              Aim for 7-9 hours each night.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Sleep Modal */}
+      {showSleepModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                <Moon className="h-5 w-5 text-indigo-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-black text-lg">Log Sleep</h3>
+                <p className="text-sm text-grey-500">How did you sleep last night?</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-grey-700 mb-2">
+                  Hours Slept
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="24"
+                  value={sleepInput.hours}
+                  onChange={(e) => setSleepInput({ ...sleepInput, hours: e.target.value })}
+                  placeholder="e.g., 7.5"
+                  className="w-full px-4 py-3 border border-grey-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-grey-700 mb-2">
+                  Sleep Quality
+                </label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((level) => (
+                    <button
+                      key={level}
+                      onClick={() => setSleepInput({ ...sleepInput, quality: level })}
+                      className={`flex-1 py-3 rounded-lg border-2 transition-colors ${
+                        sleepInput.quality === level
+                          ? 'border-indigo-600 bg-indigo-50'
+                          : 'border-grey-200 hover:border-grey-300'
+                      }`}
+                    >
+                      <Star
+                        className={`h-5 w-5 mx-auto ${
+                          sleepInput.quality >= level
+                            ? 'text-yellow-500 fill-yellow-500'
+                            : 'text-grey-300'
+                        }`}
+                      />
+                      <p className="text-xs text-grey-500 mt-1">
+                        {getSleepQualityLabel(level)}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowSleepModal(false)}
+                className="flex-1 py-3 border border-grey-300 rounded-lg font-medium text-grey-700 hover:bg-grey-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={logSleep}
+                disabled={!sleepInput.hours}
+                className="flex-1 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:bg-grey-300 disabled:cursor-not-allowed"
+              >
+                Log Sleep
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Today's Habits */}

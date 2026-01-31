@@ -9,7 +9,7 @@ const PLANS = {
   inperson: {
     unlimited: {
       name: 'Unlimited (In-Person)',
-      price: 720.0,
+      price: 900.0,
       billingCycle: 'monthly',
       planType: 'in-person',
       planKey: 'unlimited',
@@ -18,7 +18,7 @@ const PLANS = {
     },
     'elevated-physique': {
       name: 'Elevated Physique (In-Person)',
-      price: 520.0,
+      price: 720.0,
       billingCycle: 'monthly',
       planType: 'in-person',
       planKey: 'elevated-physique',
@@ -27,7 +27,7 @@ const PLANS = {
     },
     physique: {
       name: 'Physique (In-Person)',
-      price: 420.0,
+      price: 540.0,
       billingCycle: 'monthly',
       planType: 'in-person',
       planKey: 'physique',
@@ -36,7 +36,7 @@ const PLANS = {
     },
     elevated: {
       name: 'Elevated (In-Person)',
-      price: 320.0,
+      price: 360.0,
       billingCycle: 'monthly',
       planType: 'in-person',
       planKey: 'elevated',
@@ -47,7 +47,7 @@ const PLANS = {
   online: {
     unlimited: {
       name: 'Unlimited (Online)',
-      price: 360.0,
+      price: 700.0,
       billingCycle: 'monthly',
       planType: 'online',
       planKey: 'unlimited',
@@ -56,7 +56,7 @@ const PLANS = {
     },
     'elevated-physique': {
       name: 'Elevated Physique (Online)',
-      price: 260.0,
+      price: 560.0,
       billingCycle: 'monthly',
       planType: 'online',
       planKey: 'elevated-physique',
@@ -65,7 +65,7 @@ const PLANS = {
     },
     physique: {
       name: 'Physique (Online)',
-      price: 210.0,
+      price: 420.0,
       billingCycle: 'monthly',
       planType: 'online',
       planKey: 'physique',
@@ -74,7 +74,7 @@ const PLANS = {
     },
     elevated: {
       name: 'Elevated (Online)',
-      price: 150.0,
+      price: 280.0,
       billingCycle: 'monthly',
       planType: 'online',
       planKey: 'elevated',

@@ -15,6 +15,11 @@ import {
   Settings,
   LogOut,
   X,
+  Target,
+  UtensilsCrossed,
+  Gift,
+  BarChart3,
+  Bell,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -23,12 +28,17 @@ const navigation = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Workouts', href: '/dashboard/workouts', icon: Dumbbell },
   { name: 'Progress', href: '/dashboard/progress', icon: TrendingUp },
+  { name: 'Reports', href: '/dashboard/reports', icon: BarChart3 },
+  { name: 'Goals', href: '/dashboard/goals', icon: Target },
   { name: 'Habits', href: '/dashboard/habits', icon: CheckSquare },
   { name: 'Check-ins', href: '/dashboard/check-ins', icon: Calendar },
   { name: 'Messages', href: '/dashboard/messages', icon: MessageSquare },
   { name: 'Videos', href: '/dashboard/videos', icon: PlayCircle },
   { name: 'Calendar', href: '/dashboard/calendar', icon: Calendar },
   { name: 'Nutrition', href: '/dashboard/nutrition', icon: Apple },
+  { name: 'Recipes', href: '/dashboard/recipes', icon: UtensilsCrossed },
+  { name: 'Referrals', href: '/dashboard/referrals', icon: Gift },
+  { name: 'Notifications', href: '/dashboard/notifications', icon: Bell },
   { name: 'Subscription', href: '/dashboard/subscription', icon: CreditCard },
 ];
 

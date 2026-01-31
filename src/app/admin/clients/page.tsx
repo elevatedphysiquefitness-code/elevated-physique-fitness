@@ -1,16 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { Search, Filter, MoreVertical, Mail, Eye } from 'lucide-react';
+import { Search, Filter, MoreVertical, Mail, Eye, X } from 'lucide-react';
 import Button from '@/components/ui/Button';
+import ProfileAvatar from '@/components/ui/ProfileAvatar';
 
 interface Client {
   id: string;
   full_name: string;
   email: string;
   phone: string;
+  avatar_url: string | null;
   created_at: string;
   subscription?: {
     plan_name: string;
@@ -19,10 +22,15 @@ interface Client {
   program?: {
     title: string;
     current_week: number;
+    program_id?: string;
   };
 }
 
 export default function ClientsPage() {
+  const searchParams = useSearchParams();
+  const programFilter = searchParams.get('program');
+  const programName = searchParams.get('programName');
+
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +39,7 @@ export default function ClientsPage() {
 
   useEffect(() => {
     fetchClients();
-  }, []);
+  }, [programFilter]);
 
   const fetchClients = async () => {
     const supabase = createClient();
@@ -39,7 +47,7 @@ export default function ClientsPage() {
     // First fetch profiles without complex joins to avoid FK ambiguity
     const { data: profilesData, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, full_name, email, phone, created_at')
+      .select('id, full_name, email, phone, avatar_url, created_at')
       .eq('role', 'client')
       .order('created_at', { ascending: false });
 
@@ -66,7 +74,7 @@ export default function ClientsPage() {
         .in('client_id', clientIds),
       supabase
         .from('client_programs')
-        .select('client_id, program_name, current_week, status')
+        .select('client_id, program_id, program_name, current_week, status')
         .in('client_id', clientIds)
     ]);
 
@@ -86,13 +94,13 @@ export default function ClientsPage() {
         // Prefer active programs
         const existing = programMap.get(prog.client_id);
         if (!existing || prog.status === 'active') {
-          programMap.set(prog.client_id, prog);
+          programMap.set(prog.client_id, { ...prog, program_id: prog.program_id });
         }
       });
     }
 
     // Combine and format the data
-    const formattedClients = profilesData.map(profile => {
+    let formattedClients = profilesData.map(profile => {
       const subscription = subscriptionMap.get(profile.id);
       const program = programMap.get(profile.id);
       return {
@@ -100,6 +108,7 @@ export default function ClientsPage() {
         full_name: profile.full_name,
         email: profile.email,
         phone: profile.phone,
+        avatar_url: profile.avatar_url,
         created_at: profile.created_at,
         subscription: subscription ? {
           plan_name: subscription.plan_name,
@@ -108,9 +117,17 @@ export default function ClientsPage() {
         program: program ? {
           title: program.program_name,
           current_week: program.current_week,
+          program_id: program.program_id,
         } : undefined,
       };
     });
+
+    // Filter by program if specified in URL
+    if (programFilter) {
+      formattedClients = formattedClients.filter(
+        client => client.program?.program_id === programFilter
+      );
+    }
 
     setClients(formattedClients);
     setLoading(false);
@@ -166,8 +183,25 @@ export default function ClientsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-black">Clients</h1>
-          <p className="text-grey-600 mt-1">{clients.length} total clients</p>
+          <p className="text-grey-600 mt-1">
+            {programFilter ? (
+              <>
+                {clients.length} client{clients.length !== 1 ? 's' : ''} assigned to {programName || 'this program'}
+              </>
+            ) : (
+              <>{clients.length} total clients</>
+            )}
+          </p>
         </div>
+        {programFilter && (
+          <Link
+            href="/admin/clients"
+            className="flex items-center gap-2 px-4 py-2 bg-grey-100 hover:bg-grey-200 text-grey-700 text-sm font-medium transition-colors"
+          >
+            <X className="h-4 w-4" />
+            Clear Filter
+          </Link>
+        )}
       </div>
 
       {/* Filters */}
@@ -214,9 +248,11 @@ export default function ClientsPage() {
                 <tr key={client.id} className="hover:bg-grey-50">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-600 flex items-center justify-center text-white font-bold">
-                        {client.full_name?.charAt(0).toUpperCase() || 'C'}
-                      </div>
+                      <ProfileAvatar
+                        avatarUrl={client.avatar_url}
+                        userName={client.full_name}
+                        size="md"
+                      />
                       <div>
                         <p className="font-medium text-black">{client.full_name || 'Unknown'}</p>
                         <p className="text-sm text-grey-500">{client.email}</p>
