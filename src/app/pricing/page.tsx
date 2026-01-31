@@ -239,50 +239,117 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* Membership Commitment Tiers */}
+      {/* Membership Commitment Tiers - Interactive Pricing Table */}
       <section className="py-16 bg-[#EBE4D6]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-[#3D2314]">Commitment Options</h2>
+            <h2 className="text-3xl font-bold text-[#3D2314]">Commitment Pricing</h2>
             <p className="mt-4 text-[#6B4423] max-w-2xl mx-auto">
-              Choose the commitment length that works for your goals. Longer commitments come with added benefits.
+              Choose your commitment length and sessions per week. Longer commitments = bigger savings.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            <div className="bg-white p-6 text-center border-2 border-grey-200 hover:border-[#8B7355] transition-colors">
-              <h3 className="text-xl font-bold text-[#3D2314]">3-Month</h3>
-              <p className="text-grey-500 text-sm mt-1">Minimum Commitment</p>
-              <div className="mt-4 py-3 border-t border-grey-100">
-                <p className="text-grey-600 text-sm">Standard monthly rate</p>
-                <p className="text-grey-600 text-sm mt-2">Perfect for getting started</p>
-              </div>
-            </div>
+          {/* Pricing Table */}
+          <div className="max-w-4xl mx-auto overflow-x-auto">
+            <table className="w-full bg-white border-2 border-[#3D2314]">
+              <thead>
+                <tr className="bg-[#3D2314] text-white">
+                  <th className="px-4 py-4 text-left font-semibold">Commitment</th>
+                  <th className="px-4 py-4 text-center font-semibold">2x/week</th>
+                  <th className="px-4 py-4 text-center font-semibold">3x/week</th>
+                  <th className="px-4 py-4 text-center font-semibold">4x/week</th>
+                  <th className="px-4 py-4 text-center font-semibold">5x/week</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-grey-200 hover:bg-[#EBE4D6]/30 transition-colors">
+                  <td className="px-4 py-5 font-semibold text-[#3D2314]">
+                    3-Month
+                    <span className="block text-xs text-grey-500 font-normal">Minimum</span>
+                  </td>
+                  <td className="px-4 py-5 text-center">
+                    <span className="text-xl font-bold text-black">$345</span>
+                    <span className="text-grey-500 text-sm">/mo</span>
+                  </td>
+                  <td className="px-4 py-5 text-center">
+                    <span className="text-xl font-bold text-black">$520</span>
+                    <span className="text-grey-500 text-sm">/mo</span>
+                  </td>
+                  <td className="px-4 py-5 text-center">
+                    <span className="text-xl font-bold text-black">$690</span>
+                    <span className="text-grey-500 text-sm">/mo</span>
+                  </td>
+                  <td className="px-4 py-5 text-center">
+                    <span className="text-xl font-bold text-black">$865</span>
+                    <span className="text-grey-500 text-sm">/mo</span>
+                  </td>
+                </tr>
+                <tr className="border-b border-grey-200 bg-[#EBE4D6]/50 relative">
+                  <td className="px-4 py-5 font-semibold text-[#3D2314]">
+                    <div className="flex items-center gap-2">
+                      6-Month
+                      <span className="bg-[#3D2314] text-white text-[10px] font-bold px-2 py-0.5">BEST VALUE</span>
+                    </div>
+                    <span className="block text-xs text-grey-500 font-normal">Recommended</span>
+                  </td>
+                  <td className="px-4 py-5 text-center">
+                    <span className="text-xl font-bold text-[#3D2314]">$335</span>
+                    <span className="text-grey-500 text-sm">/mo</span>
+                  </td>
+                  <td className="px-4 py-5 text-center">
+                    <span className="text-xl font-bold text-[#3D2314]">$500</span>
+                    <span className="text-grey-500 text-sm">/mo</span>
+                  </td>
+                  <td className="px-4 py-5 text-center">
+                    <span className="text-xl font-bold text-[#3D2314]">$670</span>
+                    <span className="text-grey-500 text-sm">/mo</span>
+                  </td>
+                  <td className="px-4 py-5 text-center">
+                    <span className="text-xl font-bold text-[#3D2314]">$835</span>
+                    <span className="text-grey-500 text-sm">/mo</span>
+                  </td>
+                </tr>
+                <tr className="hover:bg-[#EBE4D6]/30 transition-colors">
+                  <td className="px-4 py-5 font-semibold text-[#3D2314]">
+                    1-Year
+                    <span className="block text-xs text-grey-500 font-normal">Maximum Savings</span>
+                  </td>
+                  <td className="px-4 py-5 text-center">
+                    <span className="text-xl font-bold text-black">$325</span>
+                    <span className="text-grey-500 text-sm">/mo</span>
+                  </td>
+                  <td className="px-4 py-5 text-center">
+                    <span className="text-xl font-bold text-black">$485</span>
+                    <span className="text-grey-500 text-sm">/mo</span>
+                  </td>
+                  <td className="px-4 py-5 text-center">
+                    <span className="text-xl font-bold text-black">$650</span>
+                    <span className="text-grey-500 text-sm">/mo</span>
+                  </td>
+                  <td className="px-4 py-5 text-center">
+                    <span className="text-xl font-bold text-black">$810</span>
+                    <span className="text-grey-500 text-sm">/mo</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-            <div className="bg-white p-6 text-center border-2 border-[#3D2314] relative">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#3D2314] text-white text-xs font-semibold px-3 py-1">
-                BEST VALUE
-              </div>
-              <h3 className="text-xl font-bold text-[#3D2314]">6-Month</h3>
-              <p className="text-grey-500 text-sm mt-1">Recommended</p>
-              <div className="mt-4 py-3 border-t border-grey-100">
-                <p className="text-[#3D2314] font-semibold text-sm">5% discount on monthly rate</p>
-                <p className="text-grey-600 text-sm mt-2">Ideal for real transformation</p>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 text-center border-2 border-grey-200 hover:border-[#8B7355] transition-colors">
-              <h3 className="text-xl font-bold text-[#3D2314]">1-Year</h3>
-              <p className="text-grey-500 text-sm mt-1">Maximum Savings</p>
-              <div className="mt-4 py-3 border-t border-grey-100">
-                <p className="text-[#3D2314] font-semibold text-sm">10% discount on monthly rate</p>
-                <p className="text-grey-600 text-sm mt-2">For serious long-term results</p>
-              </div>
-            </div>
+          <div className="max-w-4xl mx-auto mt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <p className="text-sm text-[#6B4423]">
+              <strong>No commitment?</strong> See our monthly plans above with no long-term obligation.
+            </p>
+            <a
+              href="/apply"
+              className="bg-[#3D2314] text-white px-6 py-3 font-semibold hover:bg-[#4D3324] transition-colors inline-flex items-center"
+            >
+              Apply Now
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </a>
           </div>
 
           <p className="text-center text-sm text-[#6B4423] mt-8">
-            Commitment details and terms are outlined in our{' '}
+            Minimum commitment details and cancellation terms in our{' '}
             <a href="/policies" className="text-[#3D2314] underline hover:text-[#4D3324]">Policies page</a>.
           </p>
         </div>
