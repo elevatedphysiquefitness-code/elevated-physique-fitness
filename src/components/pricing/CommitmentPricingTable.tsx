@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { ArrowRight, X, Check, Loader2 } from 'lucide-react';
 
 const commitmentPricing = {
-  '3-month': { label: '3-Month', sublabel: 'Minimum', prices: { 2: 345, 3: 520, 4: 690, 5: 865 } },
+  '3-month': { label: '3-Month', sublabel: 'Minimum', bestValue: false, prices: { 2: 345, 3: 520, 4: 690, 5: 865 } },
   '6-month': { label: '6-Month', sublabel: 'Recommended', bestValue: true, prices: { 2: 335, 3: 500, 4: 670, 5: 835 } },
-  '1-year': { label: '1-Year', sublabel: 'Maximum Savings', prices: { 2: 325, 3: 485, 4: 650, 5: 810 } },
+  '1-year': { label: '1-Year', sublabel: 'Maximum Savings', bestValue: false, prices: { 2: 325, 3: 485, 4: 650, 5: 810 } },
 };
 
 type CommitmentKey = keyof typeof commitmentPricing;
