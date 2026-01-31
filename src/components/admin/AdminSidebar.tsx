@@ -13,12 +13,14 @@ import {
   LogOut,
   X,
   Video,
+  Inbox,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 
 const navigation = [
   { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+  { name: 'Inquiries', href: '/admin/inquiries', icon: Inbox },
   { name: 'Clients', href: '/admin/clients', icon: Users },
   { name: 'Programs', href: '/admin/programs', icon: Dumbbell },
   { name: 'Exercises', href: '/admin/exercises', icon: Video },
