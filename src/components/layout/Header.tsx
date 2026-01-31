@@ -23,17 +23,14 @@ export default function Header() {
       <nav className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-20 items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-3">
+          <Link href="/" className="flex items-center">
             <Image
               src="/logo.png"
-              alt="Elevated Physique"
-              width={40}
-              height={40}
-              className="h-10 w-auto"
+              alt="Elevated Physique Fitness"
+              width={80}
+              height={80}
+              className="h-16 w-auto"
             />
-            <span className="text-xl font-bold tracking-tight text-black uppercase">
-              Elevated Physique
-            </span>
           </Link>
 
           {/* Desktop Navigation */}
