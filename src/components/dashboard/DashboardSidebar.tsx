@@ -29,6 +29,7 @@ const navigation = [
   { name: 'Workouts', href: '/dashboard/workouts', icon: Dumbbell },
   { name: 'Progress', href: '/dashboard/progress', icon: TrendingUp },
   { name: 'Nutrition', href: '/dashboard/nutrition', icon: Apple },
+  { name: 'Food History', href: '/dashboard/food-history', icon: UtensilsCrossed },
   { name: 'Check-ins', href: '/dashboard/check-ins', icon: Calendar },
   { name: 'Messages', href: '/dashboard/messages', icon: MessageSquare },
   { name: 'Videos', href: '/dashboard/videos', icon: PlayCircle },
