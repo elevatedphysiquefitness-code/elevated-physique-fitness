@@ -15,6 +15,8 @@ import {
   Wheat,
   Apple,
   ArrowLeft,
+  Target,
+  Droplets,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -34,6 +36,20 @@ interface FoodLog {
   logged_at: string;
 }
 
+interface ClientData {
+  weight: number | null;
+  bodyFatPercentage: number | null;
+  goal: string | null;
+  activityLevel: string | null;
+}
+
+interface Macros {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+}
+
 const mealTypeLabels: Record<string, string> = {
   breakfast: 'Breakfast',
   lunch: 'Lunch',
@@ -44,6 +60,90 @@ const mealTypeLabels: Record<string, string> = {
   other: 'Other',
 };
 
+const goalLabels: Record<string, string> = {
+  fat_loss: 'Fat Loss',
+  muscle_gain: 'Muscle Gain',
+  recomposition: 'Body Recomposition',
+  maintenance: 'Maintenance',
+  strength: 'Strength',
+  general_fitness: 'General Fitness',
+};
+
+// Macro calculation function
+function calculateMacros(
+  weight: number,
+  goal: 'fat_loss' | 'muscle_gain' | 'recomposition' | 'maintenance' | 'strength' | 'general_fitness',
+  activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active',
+  bodyFatPercentage?: number
+): Macros {
+  const weightKg = weight * 0.453592;
+  let bmr: number;
+
+  if (bodyFatPercentage && bodyFatPercentage > 0 && bodyFatPercentage < 100) {
+    const leanBodyMassKg = weightKg * (1 - bodyFatPercentage / 100);
+    bmr = 370 + (21.6 * leanBodyMassKg);
+  } else {
+    bmr = 10 * weightKg + 6.25 * 170 - 5 * 30 + 5;
+  }
+
+  const activityMultipliers = {
+    sedentary: 1.2,
+    light: 1.375,
+    moderate: 1.55,
+    active: 1.725,
+    very_active: 1.9,
+  };
+
+  const tdee = bmr * activityMultipliers[activityLevel];
+
+  let calories: number;
+  let proteinMultiplier: number;
+  let fatMultiplier: number;
+
+  switch (goal) {
+    case 'fat_loss':
+      calories = tdee - 500;
+      proteinMultiplier = 1.0;
+      fatMultiplier = 0.35;
+      break;
+    case 'muscle_gain':
+      calories = tdee + 300;
+      proteinMultiplier = 1.0;
+      fatMultiplier = 0.25;
+      break;
+    case 'recomposition':
+      calories = tdee;
+      proteinMultiplier = 1.0;
+      fatMultiplier = 0.3;
+      break;
+    case 'strength':
+      calories = tdee + 200;
+      proteinMultiplier = 0.9;
+      fatMultiplier = 0.3;
+      break;
+    case 'maintenance':
+    case 'general_fitness':
+    default:
+      calories = tdee;
+      proteinMultiplier = 0.8;
+      fatMultiplier = 0.3;
+      break;
+  }
+
+  const protein = Math.round(weight * proteinMultiplier);
+  const fats = Math.round((calories * fatMultiplier) / 9);
+  const proteinCals = protein * 4;
+  const fatCals = fats * 9;
+  const carbs = Math.round((calories - proteinCals - fatCals) / 4);
+
+  return {
+    calories: Math.round(calories),
+    protein,
+    carbs: Math.max(carbs, 100),
+    fats,
+  };
+}
+
 export default function FoodHistoryPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,23 +151,96 @@ export default function FoodHistoryPage() {
   const [historyRange, setHistoryRange] = useState<'week' | 'month' | 'all'>('week');
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
 
+  // Macro tracker state
+  const [clientData, setClientData] = useState<ClientData>({
+    weight: null,
+    bodyFatPercentage: null,
+    goal: null,
+    activityLevel: null,
+  });
+  const [macros, setMacros] = useState<Macros | null>(null);
+  const [todayLogs, setTodayLogs] = useState<FoodLog[]>([]);
+
+  const today = new Date().toISOString().split('T')[0];
+
   useEffect(() => {
-    const fetchUser = async () => {
+    const fetchUserAndData = async () => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
+
+        // Fetch client data for macro calculation
+        const { data: measurementData } = await supabase
+          .from('measurements')
+          .select('weight, body_fat_percentage')
+          .eq('client_id', user.id)
+          .order('measurement_date', { ascending: false })
+          .limit(1)
+          .single();
+
+        const { data: detailsData } = await supabase
+          .from('client_details')
+          .select('goals, activity_level')
+          .eq('user_id', user.id)
+          .single();
+
+        const weight = measurementData?.weight || null;
+        const bodyFatPercentage = measurementData?.body_fat_percentage || null;
+        const goal = detailsData?.goals || null;
+        const activityLevel = detailsData?.activity_level || null;
+
+        setClientData({ weight, bodyFatPercentage, goal, activityLevel });
+
+        if (weight && goal && activityLevel) {
+          const calculatedMacros = calculateMacros(
+            weight,
+            goal as 'fat_loss' | 'muscle_gain' | 'recomposition' | 'maintenance' | 'strength' | 'general_fitness',
+            activityLevel as 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active',
+            bodyFatPercentage || undefined
+          );
+          setMacros(calculatedMacros);
+        }
+
+        // Fetch today's food logs
+        const { data: todayData } = await supabase
+          .from('food_logs')
+          .select('*')
+          .eq('client_id', user.id)
+          .eq('log_date', today)
+          .order('logged_at', { ascending: true });
+
+        if (todayData) {
+          setTodayLogs(todayData);
+        }
       }
       setLoading(false);
     };
-    fetchUser();
-  }, []);
+    fetchUserAndData();
+  }, [today]);
 
   useEffect(() => {
     if (userId) {
       fetchHistoryLogs(userId, historyRange);
     }
   }, [userId, historyRange]);
+
+  // Calculate consumed macros from today's logs
+  const consumedMacros = todayLogs.reduce(
+    (acc, log) => ({
+      calories: acc.calories + (log.calories || 0),
+      protein: acc.protein + (log.protein || 0),
+      carbs: acc.carbs + (log.carbs || 0),
+      fat: acc.fat + (log.fat || 0),
+    }),
+    { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  );
+
+  // Calculate percentages
+  const calculatePercentage = (consumed: number, target: number) => {
+    if (target === 0) return 0;
+    return Math.min(Math.round((consumed / target) * 100), 100);
+  };
 
   const fetchHistoryLogs = async (clientId: string, range: 'week' | 'month' | 'all') => {
     setLoading(true);
@@ -166,6 +339,117 @@ export default function FoodHistoryPage() {
           </Button>
         </Link>
       </div>
+
+      {/* Today's Macro Tracker */}
+      {macros && (
+        <Card className="border-2 border-chocolate">
+          <CardContent className="p-6 bg-white">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-chocolate flex items-center justify-center rounded-lg">
+                  <Target className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-black">Today&apos;s Progress</h2>
+                  <p className="text-grey-500 text-sm">
+                    {clientData.weight} lbs | {goalLabels[clientData.goal || 'maintenance']}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-grey-500">Water Goal</p>
+                <p className="font-semibold text-blue-600 flex items-center gap-1">
+                  <Droplets className="h-4 w-4" />
+                  {clientData.weight ? Math.round((clientData.weight / 2)) : '--'} oz
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Calories */}
+              <div className="bg-orange-50 p-3 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <Flame className="h-5 w-5 text-orange-600" />
+                  <span className="text-xs text-orange-600 font-medium">
+                    {calculatePercentage(consumedMacros.calories, macros.calories)}%
+                  </span>
+                </div>
+                <p className="text-xl font-bold text-orange-600">{consumedMacros.calories}</p>
+                <p className="text-xs text-orange-700">/ {macros.calories} cal</p>
+                <div className="mt-2 h-2 bg-orange-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-orange-600 transition-all duration-500"
+                    style={{ width: `${calculatePercentage(consumedMacros.calories, macros.calories)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Protein */}
+              <div className="bg-red-50 p-3 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <Beef className="h-5 w-5 text-red-600" />
+                  <span className="text-xs text-red-600 font-medium">
+                    {calculatePercentage(consumedMacros.protein, macros.protein)}%
+                  </span>
+                </div>
+                <p className="text-xl font-bold text-red-600">{Math.round(consumedMacros.protein)}g</p>
+                <p className="text-xs text-red-700">/ {macros.protein}g protein</p>
+                <div className="mt-2 h-2 bg-red-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-red-600 transition-all duration-500"
+                    style={{ width: `${calculatePercentage(consumedMacros.protein, macros.protein)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Carbs */}
+              <div className="bg-yellow-50 p-3 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <Wheat className="h-5 w-5 text-yellow-600" />
+                  <span className="text-xs text-yellow-600 font-medium">
+                    {calculatePercentage(consumedMacros.carbs, macros.carbs)}%
+                  </span>
+                </div>
+                <p className="text-xl font-bold text-yellow-600">{Math.round(consumedMacros.carbs)}g</p>
+                <p className="text-xs text-yellow-700">/ {macros.carbs}g carbs</p>
+                <div className="mt-2 h-2 bg-yellow-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-yellow-600 transition-all duration-500"
+                    style={{ width: `${calculatePercentage(consumedMacros.carbs, macros.carbs)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Fats */}
+              <div className="bg-green-50 p-3 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <Apple className="h-5 w-5 text-green-600" />
+                  <span className="text-xs text-green-600 font-medium">
+                    {calculatePercentage(consumedMacros.fat, macros.fats)}%
+                  </span>
+                </div>
+                <p className="text-xl font-bold text-green-600">{Math.round(consumedMacros.fat)}g</p>
+                <p className="text-xs text-green-700">/ {macros.fats}g fat</p>
+                <div className="mt-2 h-2 bg-green-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-green-600 transition-all duration-500"
+                    style={{ width: `${calculatePercentage(consumedMacros.fat, macros.fats)}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Remaining summary */}
+            <div className="mt-4 pt-4 border-t border-grey-200 flex flex-wrap gap-4 text-sm">
+              <span className="text-grey-600">Remaining:</span>
+              <span className="text-orange-600 font-medium">{Math.max(0, macros.calories - consumedMacros.calories)} cal</span>
+              <span className="text-red-600 font-medium">{Math.max(0, macros.protein - consumedMacros.protein)}g P</span>
+              <span className="text-yellow-600 font-medium">{Math.max(0, macros.carbs - consumedMacros.carbs)}g C</span>
+              <span className="text-green-600 font-medium">{Math.max(0, macros.fats - consumedMacros.fat)}g F</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Time Range Filter */}
       <div className="flex items-center gap-2">
