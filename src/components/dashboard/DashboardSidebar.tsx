@@ -28,18 +28,11 @@ const navigation = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Workouts', href: '/dashboard/workouts', icon: Dumbbell },
   { name: 'Progress', href: '/dashboard/progress', icon: TrendingUp },
-  { name: 'Reports', href: '/dashboard/reports', icon: BarChart3 },
-  { name: 'Goals', href: '/dashboard/goals', icon: Target },
-  { name: 'Habits', href: '/dashboard/habits', icon: CheckSquare },
+  { name: 'Nutrition', href: '/dashboard/nutrition', icon: Apple },
   { name: 'Check-ins', href: '/dashboard/check-ins', icon: Calendar },
   { name: 'Messages', href: '/dashboard/messages', icon: MessageSquare },
   { name: 'Videos', href: '/dashboard/videos', icon: PlayCircle },
-  { name: 'Calendar', href: '/dashboard/calendar', icon: Calendar },
-  { name: 'Nutrition', href: '/dashboard/nutrition', icon: Apple },
-  { name: 'Recipes', href: '/dashboard/recipes', icon: UtensilsCrossed },
   { name: 'Referrals', href: '/dashboard/referrals', icon: Gift },
-  { name: 'Notifications', href: '/dashboard/notifications', icon: Bell },
-  { name: 'Subscription', href: '/dashboard/subscription', icon: CreditCard },
 ];
 
 interface DashboardSidebarProps {
@@ -121,8 +114,13 @@ export default function DashboardSidebar({ isOpen, onClose }: DashboardSidebarPr
           {/* Footer */}
           <div className="border-t border-grey-800 p-3 space-y-1">
             <Link
-              href="/dashboard/onboarding"
-              className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-grey-400 hover:bg-grey-800 hover:text-white transition-colors"
+              href="/dashboard/settings"
+              onClick={onClose}
+              className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors ${
+                pathname.startsWith('/dashboard/settings')
+                  ? 'bg-blue-600 text-white'
+                  : 'text-grey-400 hover:bg-grey-800 hover:text-white'
+              }`}
             >
               <Settings className="h-5 w-5" />
               Settings

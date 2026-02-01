@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Button from '@/components/ui/Button';
-import { Send, CheckCircle, MapPin, Mail, ArrowRight, Phone } from 'lucide-react';
+import { Send, CheckCircle, MapPin, Mail, ArrowRight, Phone, Loader2 } from 'lucide-react';
 
 const goals = [
   'Lose fat & get lean',
@@ -34,16 +34,29 @@ export default function ContactPage() {
     message: '',
   });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Form data will be sent via email link as a backup
-    const subject = encodeURIComponent(`New Contact Form: ${formData.name}`);
-    const body = encodeURIComponent(
-      `Name: ${formData.name}\nEmail: ${formData.email}\nPhone: ${formData.phone || 'Not provided'}\nWorkout Days: ${formData.workoutDays || 'Not specified'}\nAvailability: ${formData.availability || 'Not specified'}\nGoal: ${formData.goals || 'Not specified'}\n\nMessage:\n${formData.message}`
-    );
-    window.location.href = `mailto:elevatedphysiquefitness@gmail.com?subject=${subject}&body=${body}`;
-    setSubmitted(true);
+    setSubmitting(true);
+
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (response.ok) {
+        setSubmitted(true);
+      } else {
+        alert('Something went wrong. Please try again or email us directly.');
+      }
+    } catch (error) {
+      alert('Something went wrong. Please try again or email us directly.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleChange = (
@@ -299,9 +312,18 @@ export default function ContactPage() {
                   />
                 </div>
 
-                <Button type="submit" variant="primary" size="lg" className="w-full">
-                  Send Message
-                  <Send className="ml-2 h-5 w-5" />
+                <Button type="submit" variant="primary" size="lg" className="w-full" disabled={submitting}>
+                  {submitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      Send Message
+                      <Send className="ml-2 h-5 w-5" />
+                    </>
+                  )}
                 </Button>
               </form>
             </div>

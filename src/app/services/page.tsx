@@ -13,6 +13,7 @@ const services = [
     icon: Users,
     title: '1-on-1 Personal Training',
     imageKey: 'services-inperson',
+    defaultImage: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&q=80',
     description: 'Private gym sessions tailored to your goals, experience level, and schedule.',
     features: [
       'Private training at a dedicated gym facility',
@@ -30,6 +31,7 @@ const services = [
     icon: Laptop,
     title: 'Online Coaching',
     imageKey: 'services-online',
+    defaultImage: 'https://images.unsplash.com/photo-1434494878577-86c23bcb06b9?w=800&q=80',
     description: 'Remote programming, weekly check-ins, and habit coaching for clients who train on their own.',
     features: [
       'Fully customized training program',
@@ -107,14 +109,7 @@ export default function ServicesPage() {
                     className="w-full"
                     aspectRatio="aspect-[4/3]"
                     alt={service.title}
-                    placeholder={
-                      <div className="text-center">
-                        <div className="w-20 h-20 mx-auto bg-brown-600 flex items-center justify-center">
-                          <service.icon className="h-10 w-10 text-white" />
-                        </div>
-                        <p className="mt-4 text-brown-600 font-semibold">{service.title}</p>
-                      </div>
-                    }
+                    defaultImage={service.defaultImage}
                   />
                 </div>
               </div>

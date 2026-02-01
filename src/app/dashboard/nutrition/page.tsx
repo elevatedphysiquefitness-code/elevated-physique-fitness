@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import { useToast } from '@/components/ui/Toast';
 import {
   Apple,
   Droplets,
@@ -70,7 +71,7 @@ interface FoodLog {
   protein: number;
   carbs: number;
   fat: number;
-  meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'other' | null;
+  meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'pre_workout' | 'post_workout' | 'other' | null;
   notes: string | null;
   logged_at: string;
 }
@@ -193,6 +194,8 @@ const mealTypeLabels: Record<string, string> = {
   lunch: 'Lunch',
   dinner: 'Dinner',
   snack: 'Snack',
+  pre_workout: 'Pre-Workout',
+  post_workout: 'Post-Workout',
   other: 'Other',
 };
 
@@ -255,6 +258,7 @@ const mealTiming = [
 ];
 
 export default function NutritionPage() {
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [clientData, setClientData] = useState<ClientData>({
@@ -294,7 +298,7 @@ export default function NutritionPage() {
     protein: '',
     carbs: '',
     fat: '',
-    meal_type: 'lunch' as 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'other',
+    meal_type: 'lunch' as 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'pre_workout' | 'post_workout' | 'other',
     notes: '',
   });
 
@@ -643,11 +647,12 @@ export default function NutritionPage() {
 
       if (error) {
         console.error('Error updating food log:', error);
-        alert('Failed to update food log');
+        toast.error('Failed to update food');
       } else {
         await fetchFoodLogs(userId, selectedDate);
         setShowFoodModal(false);
         resetFoodForm();
+        toast.success('Food updated!');
       }
     } else {
       // Insert new food log
@@ -657,11 +662,12 @@ export default function NutritionPage() {
 
       if (error) {
         console.error('Error adding food log:', error);
-        alert('Failed to add food log');
+        toast.error('Failed to add food');
       } else {
         await fetchFoodLogs(userId, selectedDate);
         setShowFoodModal(false);
         resetFoodForm();
+        toast.success('Food logged!');
       }
     }
 
@@ -680,9 +686,10 @@ export default function NutritionPage() {
 
     if (error) {
       console.error('Error deleting food log:', error);
-      alert('Failed to delete food log');
+      toast.error('Failed to delete food');
     } else {
       setFoodLogs(foodLogs.filter(f => f.id !== id));
+      toast.success('Food deleted!');
     }
   };
 
@@ -694,7 +701,7 @@ export default function NutritionPage() {
     return acc;
   }, {} as Record<string, FoodLog[]>);
 
-  const mealTypeOrder = ['breakfast', 'lunch', 'dinner', 'snack', 'other'];
+  const mealTypeOrder = ['breakfast', 'lunch', 'dinner', 'snack', 'pre_workout', 'post_workout', 'other'];
 
   if (loading) {
     return (
@@ -997,7 +1004,7 @@ export default function NutritionPage() {
                 {/* Daily Total */}
                 <div className="pt-4 border-t border-grey-200">
                   <div className="flex items-center justify-between">
-                    <p className="font-semibold text-black">Total Today</p>
+                    <p className="font-semibold text-black">Total {isToday ? 'Today' : formatDateDisplay(selectedDate)}</p>
                     <p className="text-sm text-grey-600">
                       <span className="font-semibold text-black">{consumedMacros.calories} cal</span>
                       {' · '}P: {Math.round(consumedMacros.protein)}g
@@ -1649,19 +1656,19 @@ export default function NutritionPage() {
                   <label className="block text-sm font-medium text-black mb-2">
                     Meal Type
                   </label>
-                  <div className="grid grid-cols-5 gap-2">
-                    {(['breakfast', 'lunch', 'dinner', 'snack', 'other'] as const).map((type) => (
+                  <div className="grid grid-cols-4 gap-2">
+                    {(['breakfast', 'lunch', 'dinner', 'snack', 'pre_workout', 'post_workout', 'other'] as const).map((type) => (
                       <button
                         key={type}
                         type="button"
                         onClick={() => setNewFood({ ...newFood, meal_type: type })}
-                        className={`px-2 py-2 text-xs font-medium capitalize transition-colors ${
+                        className={`px-2 py-2 text-xs font-medium transition-colors ${
                           newFood.meal_type === type
                             ? 'bg-blue-600 text-white'
                             : 'bg-grey-100 text-grey-700 hover:bg-grey-200'
                         }`}
                       >
-                        {type}
+                        {mealTypeLabels[type]}
                       </button>
                     ))}
                   </div>

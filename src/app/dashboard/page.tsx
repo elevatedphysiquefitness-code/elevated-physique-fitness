@@ -329,11 +329,14 @@ export default function DashboardPage() {
     <div className="space-y-6">
       {/* Welcome Message */}
       <div className="bg-gradient-to-r from-cinnamon to-chocolate text-white p-6 rounded-lg relative overflow-hidden">
-        {/* EP Pattern */}
+        {/* EP Logo Pattern */}
         <div
-          className="absolute inset-0 opacity-[0.06]"
+          className="absolute inset-0 opacity-[0.12]"
           style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='10' y='40' font-family='Arial, sans-serif' font-size='28' font-weight='bold' fill='%23ffffff'%3EEP%3C/text%3E%3Ctext x='60' y='80' font-family='Arial, sans-serif' font-size='28' font-weight='bold' fill='%23ffffff'%3EEP%3C/text%3E%3C/svg%3E")`,
+            backgroundImage: `url("/ep-icon.png")`,
+            backgroundSize: '60px 60px',
+            backgroundRepeat: 'repeat',
+            filter: 'brightness(2)',
           }}
         />
         <div className="relative z-10">

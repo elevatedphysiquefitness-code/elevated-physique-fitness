@@ -22,6 +22,9 @@ import {
   Trash2,
   Clock,
   GripVertical,
+  Utensils,
+  Activity,
+  TrendingUp,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -92,6 +95,30 @@ interface Measurement {
   body_fat_percentage: number | null;
 }
 
+interface FoodLog {
+  id: string;
+  log_date: string;
+  food_name: string;
+  servings: number;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  meal_type: string;
+}
+
+interface WorkoutLog {
+  id: string;
+  workout_date: string;
+  exercise_id: string;
+  exercise_name?: string;
+  set_number: number;
+  weight: number | null;
+  reps: number | null;
+  rpe: number | null;
+  is_pr: boolean;
+}
+
 export default function ClientDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -121,10 +148,122 @@ export default function ClientDetailPage() {
   });
   const [selectedExerciseId, setSelectedExerciseId] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [foodLogs, setFoodLogs] = useState<FoodLog[]>([]);
+  const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([]);
+  const [foodLogDays, setFoodLogDays] = useState(30);
+  const [workoutLogDays, setWorkoutLogDays] = useState(30);
+  const [loadingMoreFood, setLoadingMoreFood] = useState(false);
+  const [loadingMoreWorkouts, setLoadingMoreWorkouts] = useState(false);
 
   useEffect(() => {
     fetchClientData();
   }, [clientId]);
+
+  const fetchFoodLogs = async (supabase: any, clientId: string, days: number) => {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    const { data: foodData } = await supabase
+      .from('food_logs')
+      .select('*')
+      .eq('client_id', clientId)
+      .gte('log_date', startDate.toISOString().split('T')[0])
+      .order('log_date', { ascending: false })
+      .order('logged_at', { ascending: false });
+    if (foodData) {
+      setFoodLogs(foodData);
+      setFoodLogDays(days);
+    }
+  };
+
+  const fetchWorkoutLogs = async (supabase: any, clientId: string, days: number) => {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    const { data: workoutLogData } = await supabase
+      .from('workout_logs')
+      .select(`
+        id,
+        workout_date,
+        exercise_id,
+        set_number,
+        weight,
+        reps,
+        rpe,
+        is_pr,
+        exercises (name)
+      `)
+      .eq('client_id', clientId)
+      .gte('workout_date', startDate.toISOString().split('T')[0])
+      .order('workout_date', { ascending: false })
+      .order('set_number', { ascending: true });
+    if (workoutLogData) {
+      setWorkoutLogs(workoutLogData.map((log: any) => ({
+        ...log,
+        exercise_name: log.exercises?.name || 'Unknown Exercise',
+      })));
+      setWorkoutLogDays(days);
+    }
+  };
+
+  const loadMoreFoodLogs = async () => {
+    setLoadingMoreFood(true);
+    const supabase = createClient();
+    const newDays = foodLogDays + 30;
+    await fetchFoodLogs(supabase, clientId, newDays);
+    setLoadingMoreFood(false);
+  };
+
+  const loadMoreWorkoutLogs = async () => {
+    setLoadingMoreWorkouts(true);
+    const supabase = createClient();
+    const newDays = workoutLogDays + 30;
+    await fetchWorkoutLogs(supabase, clientId, newDays);
+    setLoadingMoreWorkouts(false);
+  };
+
+  const loadAllFoodLogs = async () => {
+    setLoadingMoreFood(true);
+    const supabase = createClient();
+    const { data: foodData } = await supabase
+      .from('food_logs')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('log_date', { ascending: false })
+      .order('logged_at', { ascending: false });
+    if (foodData) {
+      setFoodLogs(foodData);
+      setFoodLogDays(9999);
+    }
+    setLoadingMoreFood(false);
+  };
+
+  const loadAllWorkoutLogs = async () => {
+    setLoadingMoreWorkouts(true);
+    const supabase = createClient();
+    const { data: workoutLogData } = await supabase
+      .from('workout_logs')
+      .select(`
+        id,
+        workout_date,
+        exercise_id,
+        set_number,
+        weight,
+        reps,
+        rpe,
+        is_pr,
+        exercises (name)
+      `)
+      .eq('client_id', clientId)
+      .order('workout_date', { ascending: false })
+      .order('set_number', { ascending: true });
+    if (workoutLogData) {
+      setWorkoutLogs(workoutLogData.map((log: any) => ({
+        ...log,
+        exercise_name: log.exercises?.name || 'Unknown Exercise',
+      })));
+      setWorkoutLogDays(9999);
+    }
+    setLoadingMoreWorkouts(false);
+  };
 
   const fetchClientData = async () => {
     const supabase = createClient();
@@ -198,6 +337,12 @@ export default function ClientDetailPage() {
         };
       }));
     }
+
+    // Fetch food logs (last 30 days by default)
+    await fetchFoodLogs(supabase, clientId, 30);
+
+    // Fetch workout logs (last 30 days by default)
+    await fetchWorkoutLogs(supabase, clientId, 30);
 
     setLoading(false);
   };
@@ -712,6 +857,191 @@ export default function ClientDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Food Logs & Workout Logs */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        {/* Food Logs */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-black flex items-center gap-2">
+                <Utensils className="h-5 w-5 text-green-600" />
+                Food Logs {foodLogDays < 9999 ? `(Last ${foodLogDays} Days)` : '(All Time)'}
+              </h2>
+              <span className="text-xs text-grey-500">{foodLogs.length} entries</span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {foodLogs.length > 0 ? (
+              <div className="space-y-4">
+                {/* Daily Summaries */}
+                <div className="max-h-[500px] overflow-y-auto space-y-3">
+                  {(() => {
+                    const dailyTotals: Record<string, { calories: number; protein: number; carbs: number; fat: number; items: FoodLog[] }> = {};
+                    foodLogs.forEach(log => {
+                      if (!dailyTotals[log.log_date]) {
+                        dailyTotals[log.log_date] = { calories: 0, protein: 0, carbs: 0, fat: 0, items: [] };
+                      }
+                      dailyTotals[log.log_date].calories += log.calories;
+                      dailyTotals[log.log_date].protein += log.protein;
+                      dailyTotals[log.log_date].carbs += log.carbs;
+                      dailyTotals[log.log_date].fat += log.fat;
+                      dailyTotals[log.log_date].items.push(log);
+                    });
+                    return Object.entries(dailyTotals)
+                      .sort(([a], [b]) => b.localeCompare(a))
+                      .map(([date, totals]) => (
+                        <div key={date} className="border border-grey-200 p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="font-medium text-black">
+                              {new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </p>
+                            <span className="text-sm font-semibold text-green-600">{Math.round(totals.calories)} cal</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-xs text-grey-600 mb-3">
+                            <span className="bg-blue-50 px-2 py-1 text-center">P: {Math.round(totals.protein)}g</span>
+                            <span className="bg-yellow-50 px-2 py-1 text-center">C: {Math.round(totals.carbs)}g</span>
+                            <span className="bg-red-50 px-2 py-1 text-center">F: {Math.round(totals.fat)}g</span>
+                          </div>
+                          <div className="space-y-1">
+                            {totals.items.map((item, i) => (
+                              <div key={i} className="flex justify-between text-xs text-grey-500">
+                                <span className="truncate flex-1">{item.food_name}</span>
+                                <span className="ml-2">{item.calories} cal</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ));
+                  })()}
+                </div>
+                {/* Load More Buttons */}
+                {foodLogDays < 9999 && (
+                  <div className="flex gap-2 pt-2 border-t border-grey-200">
+                    <button
+                      onClick={loadMoreFoodLogs}
+                      disabled={loadingMoreFood}
+                      className="flex-1 text-sm text-blue-600 hover:text-blue-800 py-2 border border-blue-200 hover:bg-blue-50 disabled:opacity-50"
+                    >
+                      {loadingMoreFood ? 'Loading...' : 'Load 30 More Days'}
+                    </button>
+                    <button
+                      onClick={loadAllFoodLogs}
+                      disabled={loadingMoreFood}
+                      className="flex-1 text-sm text-grey-600 hover:text-grey-800 py-2 border border-grey-200 hover:bg-grey-50 disabled:opacity-50"
+                    >
+                      {loadingMoreFood ? 'Loading...' : 'Load All'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Utensils className="h-10 w-10 mx-auto text-grey-300 mb-3" />
+                <p className="text-grey-500 text-sm">No food logs recorded yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Workout Logs */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-black flex items-center gap-2">
+                <Activity className="h-5 w-5 text-purple-600" />
+                Workout Logs {workoutLogDays < 9999 ? `(Last ${workoutLogDays} Days)` : '(All Time)'}
+              </h2>
+              <span className="text-xs text-grey-500">{workoutLogs.length} sets logged</span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {workoutLogs.length > 0 ? (
+              <div className="space-y-4">
+                {/* Group by date and exercise */}
+                <div className="max-h-[500px] overflow-y-auto space-y-3">
+                  {(() => {
+                    const groupedByDate: Record<string, Record<string, WorkoutLog[]>> = {};
+                    workoutLogs.forEach(log => {
+                      if (!groupedByDate[log.workout_date]) {
+                        groupedByDate[log.workout_date] = {};
+                      }
+                      const exerciseKey = log.exercise_name || log.exercise_id;
+                      if (!groupedByDate[log.workout_date][exerciseKey]) {
+                        groupedByDate[log.workout_date][exerciseKey] = [];
+                      }
+                      groupedByDate[log.workout_date][exerciseKey].push(log);
+                    });
+                    return Object.entries(groupedByDate)
+                      .sort(([a], [b]) => b.localeCompare(a))
+                      .map(([date, exercises]) => (
+                        <div key={date} className="border border-grey-200 p-4">
+                          <p className="font-medium text-black mb-3">
+                            {new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
+                              weekday: 'short',
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </p>
+                          <div className="space-y-3">
+                            {Object.entries(exercises).map(([exerciseName, sets]) => (
+                              <div key={exerciseName} className="bg-grey-50 p-2">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-sm font-medium text-black">{exerciseName}</span>
+                                  {sets.some(s => s.is_pr) && (
+                                    <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 flex items-center gap-1">
+                                      <TrendingUp className="h-3 w-3" /> PR
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                  {sets.map((set, i) => (
+                                    <span key={i} className="text-xs bg-white border border-grey-200 px-2 py-0.5">
+                                      {set.weight ? `${set.weight}lb` : ''} × {set.reps || '-'}
+                                      {set.rpe ? ` @${set.rpe}` : ''}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ));
+                  })()}
+                </div>
+                {/* Load More Buttons */}
+                {workoutLogDays < 9999 && (
+                  <div className="flex gap-2 pt-2 border-t border-grey-200">
+                    <button
+                      onClick={loadMoreWorkoutLogs}
+                      disabled={loadingMoreWorkouts}
+                      className="flex-1 text-sm text-purple-600 hover:text-purple-800 py-2 border border-purple-200 hover:bg-purple-50 disabled:opacity-50"
+                    >
+                      {loadingMoreWorkouts ? 'Loading...' : 'Load 30 More Days'}
+                    </button>
+                    <button
+                      onClick={loadAllWorkoutLogs}
+                      disabled={loadingMoreWorkouts}
+                      className="flex-1 text-sm text-grey-600 hover:text-grey-800 py-2 border border-grey-200 hover:bg-grey-50 disabled:opacity-50"
+                    >
+                      {loadingMoreWorkouts ? 'Loading...' : 'Load All'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Activity className="h-10 w-10 mx-auto text-grey-300 mb-3" />
+                <p className="text-grey-500 text-sm">No workout logs recorded yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Custom Workout Modal */}
       {showCustomWorkoutModal && (

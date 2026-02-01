@@ -5,8 +5,9 @@ import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import ProfileAvatar from '@/components/ui/ProfileAvatar';
 import Button from '@/components/ui/Button';
-import { User, Mail, Phone, Save, ArrowLeft } from 'lucide-react';
+import { User, Mail, Phone, Save, ArrowLeft, CreditCard, Bell, Gift } from 'lucide-react';
 import Link from 'next/link';
+import { useToast } from '@/components/ui/Toast';
 
 interface Profile {
   id: string;
@@ -157,6 +158,37 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Quick Links */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Link href="/dashboard/subscription" className="bg-white p-4 border border-grey-200 hover:border-[#3D2314] transition-colors flex items-center gap-3">
+          <div className="w-10 h-10 bg-blue-100 flex items-center justify-center">
+            <CreditCard className="h-5 w-5 text-blue-600" />
+          </div>
+          <div>
+            <p className="font-medium text-black">Subscription</p>
+            <p className="text-sm text-grey-500">Manage billing</p>
+          </div>
+        </Link>
+        <Link href="/dashboard/referrals" className="bg-white p-4 border border-grey-200 hover:border-[#3D2314] transition-colors flex items-center gap-3">
+          <div className="w-10 h-10 bg-green-100 flex items-center justify-center">
+            <Gift className="h-5 w-5 text-green-600" />
+          </div>
+          <div>
+            <p className="font-medium text-black">Referrals</p>
+            <p className="text-sm text-grey-500">Earn rewards</p>
+          </div>
+        </Link>
+        <Link href="/dashboard/onboarding" className="bg-white p-4 border border-grey-200 hover:border-[#3D2314] transition-colors flex items-center gap-3">
+          <div className="w-10 h-10 bg-purple-100 flex items-center justify-center">
+            <User className="h-5 w-5 text-purple-600" />
+          </div>
+          <div>
+            <p className="font-medium text-black">Onboarding</p>
+            <p className="text-sm text-grey-500">Update profile</p>
+          </div>
+        </Link>
+      </div>
 
       {/* Profile Information */}
       <Card>

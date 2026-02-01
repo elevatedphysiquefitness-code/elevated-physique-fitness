@@ -19,6 +19,10 @@ export async function POST(request: Request) {
       planType,
       billingCycle,
       price,
+      discountCode,
+      discountCodeId,
+      discountAmount,
+      finalPrice,
     } = body;
 
     // Validate required fields
@@ -31,26 +35,52 @@ export async function POST(request: Request) {
 
     // Insert subscription into database
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase.from('subscriptions').insert({
-      client_id: clientId,
-      plan_name: planName,
-      plan_type: planType,
-      price: price,
-      billing_cycle: billingCycle || 'monthly',
-      paypal_subscription_id: paypalSubscriptionId,
-      status: 'active',
-      start_date: new Date().toISOString().split('T')[0],
-    });
+    const { data: subscriptionData, error: subscriptionError } = await supabase
+      .from('subscriptions')
+      .insert({
+        client_id: clientId,
+        plan_name: planName,
+        plan_type: planType,
+        price: finalPrice || price,
+        billing_cycle: billingCycle || 'monthly',
+        paypal_subscription_id: paypalSubscriptionId,
+        status: 'active',
+        start_date: new Date().toISOString().split('T')[0],
+      })
+      .select('id')
+      .single();
 
-    if (error) {
-      console.error('Supabase error:', error);
+    if (subscriptionError) {
+      console.error('Supabase error:', subscriptionError);
       return NextResponse.json(
         { error: 'Failed to save subscription' },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ success: true, data });
+    // If a discount code was used, record the usage
+    if (discountCodeId && discountAmount) {
+      const { error: usageError } = await supabase
+        .from('discount_code_usage')
+        .insert({
+          discount_code_id: discountCodeId,
+          user_id: clientId,
+          subscription_id: subscriptionData?.id,
+          discount_amount: discountAmount,
+          original_price: price,
+          final_price: finalPrice,
+        });
+
+      if (usageError) {
+        console.error('Failed to record discount usage:', usageError);
+        // Don't fail the whole request, just log the error
+      }
+
+      // Increment the uses_count for the discount code
+      await supabase.rpc('increment_discount_uses', { code_id: discountCodeId });
+    }
+
+    return NextResponse.json({ success: true, data: subscriptionData });
   } catch (error) {
     console.error('API error:', error);
     return NextResponse.json(

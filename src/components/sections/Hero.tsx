@@ -7,11 +7,14 @@ export default function Hero() {
       {/* Background gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-black via-grey-900 to-black" />
 
-      {/* Subtle EP pattern */}
+      {/* Subtle EP logo pattern */}
       <div
-        className="absolute inset-0 opacity-[0.03]"
+        className="absolute inset-0 opacity-[0.12]"
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='10' y='40' font-family='Arial, sans-serif' font-size='32' font-weight='bold' fill='%23ffffff'%3EEP%3C/text%3E%3Ctext x='70' y='100' font-family='Arial, sans-serif' font-size='32' font-weight='bold' fill='%23ffffff'%3EEP%3C/text%3E%3C/svg%3E")`,
+          backgroundImage: `url("/ep-icon.png")`,
+          backgroundSize: '80px 80px',
+          backgroundRepeat: 'repeat',
+          filter: 'sepia(100%) saturate(200%) brightness(1.2) hue-rotate(-10deg)',
         }}
       />
 

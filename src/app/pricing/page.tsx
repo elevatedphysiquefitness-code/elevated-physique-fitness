@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import Image from 'next/image';
 import SectionHeading from '@/components/ui/SectionHeading';
 import Button from '@/components/ui/Button';
 import CommitmentPricingTable from '@/components/pricing/CommitmentPricingTable';
@@ -273,7 +274,7 @@ export default function PricingPage() {
               'Program adjustments as you progress',
             ].map((item) => (
               <div key={item} className="bg-white p-6 flex items-center gap-4">
-                <div className="w-3 h-3 bg-[#3D2314] flex-shrink-0" />
+                <Image src="/ep-icon.png" alt="EP" width={20} height={20} className="w-5 h-5 flex-shrink-0" />
                 <span className="text-grey-700 font-medium">{item}</span>
               </div>
             ))}
@@ -349,7 +350,7 @@ export default function PricingPage() {
                 { name: 'Nutrition Guide', description: 'Foundational nutrition & meal guide' },
               ].map((item) => (
                 <div key={item.name} className="bg-white p-6 text-center">
-                  <div className="w-3 h-3 bg-[#3D2314] mx-auto mb-4" />
+                  <Image src="/ep-icon.png" alt="EP" width={24} height={24} className="w-6 h-6 mx-auto mb-4" />
                   <h3 className="font-bold text-[#3D2314]">{item.name}</h3>
                   <p className="mt-2 text-sm text-grey-600">{item.description}</p>
                 </div>

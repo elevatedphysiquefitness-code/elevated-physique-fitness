@@ -18,6 +18,11 @@ import {
   X,
   Percent,
   Upload,
+  CheckCircle,
+  Flame,
+  Calendar,
+  Trash2,
+  CheckSquare,
 } from 'lucide-react';
 
 interface Measurement {
@@ -48,7 +53,23 @@ interface ProgressPhoto {
   photo_date: string;
 }
 
+interface Habit {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+const defaultHabits = [
+  { name: 'Drink 1 gallon of water', description: 'Stay hydrated throughout the day' },
+  { name: 'Sleep 7+ hours', description: 'Get quality sleep for recovery' },
+  { name: 'Hit protein goal', description: 'Consume your daily protein target' },
+  { name: '10,000 steps', description: 'Stay active with daily walking' },
+  { name: 'Complete workout', description: 'Finish your scheduled workout' },
+  { name: 'Meal prep', description: 'Prepare healthy meals in advance' },
+];
+
 export default function ProgressPage() {
+  const [activeTab, setActiveTab] = useState<'progress' | 'habits'>('progress');
   const [loading, setLoading] = useState(true);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [photos, setPhotos] = useState<ProgressPhoto[]>([]);
@@ -58,6 +79,16 @@ export default function ProgressPage() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoType, setPhotoType] = useState<string>('front');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Habits state
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [todayLogs, setTodayLogs] = useState<Record<string, boolean>>({});
+  const [streak, setStreak] = useState(0);
+  const [weeklyPercentage, setWeeklyPercentage] = useState(0);
+  const [showHabitModal, setShowHabitModal] = useState(false);
+  const [newHabitName, setNewHabitName] = useState('');
+  const [newHabitDescription, setNewHabitDescription] = useState('');
+  const todayStr = new Date().toISOString().split('T')[0];
 
   // Form state
   const [newMeasurement, setNewMeasurement] = useState({
@@ -81,6 +112,7 @@ export default function ProgressPage() {
 
   useEffect(() => {
     fetchProgress();
+    fetchHabits();
   }, []);
 
   const fetchProgress = async () => {
@@ -224,6 +256,145 @@ export default function ProgressPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // Habits functions
+  const fetchHabits = async () => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: userHabits } = await supabase
+      .from('habits')
+      .select('id, name, description')
+      .eq('client_id', user.id)
+      .eq('is_active', true)
+      .order('created_at');
+
+    if (userHabits) setHabits(userHabits);
+
+    const { data: logs } = await supabase
+      .from('habit_logs')
+      .select('habit_id, completed')
+      .eq('client_id', user.id)
+      .eq('log_date', todayStr);
+
+    if (logs) {
+      const logMap: Record<string, boolean> = {};
+      logs.forEach((log: { habit_id: string; completed: boolean }) => {
+        logMap[log.habit_id] = log.completed;
+      });
+      setTodayLogs(logMap);
+    }
+
+    // Calculate streak
+    let streakCount = 0;
+    let checkDate = new Date();
+    const totalHabits = userHabits?.length || 0;
+    if (totalHabits > 0) {
+      for (let i = 0; i < 365; i++) {
+        const dateStr = checkDate.toISOString().split('T')[0];
+        const { count } = await supabase
+          .from('habit_logs')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', user.id)
+          .eq('log_date', dateStr)
+          .eq('completed', true);
+        if ((count || 0) >= totalHabits) {
+          streakCount++;
+          checkDate.setDate(checkDate.getDate() - 1);
+        } else break;
+      }
+    }
+    setStreak(streakCount);
+
+    // Calculate weekly percentage
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - daysFromMonday);
+    const daysElapsed = daysFromMonday + 1;
+    const totalPossible = totalHabits * daysElapsed;
+    if (totalPossible > 0) {
+      const { count } = await supabase
+        .from('habit_logs')
+        .select('*', { count: 'exact', head: true })
+        .eq('client_id', user.id)
+        .gte('log_date', weekStart.toISOString().split('T')[0])
+        .lte('log_date', todayStr)
+        .eq('completed', true);
+      setWeeklyPercentage(Math.round(((count || 0) / totalPossible) * 100));
+    }
+  };
+
+  const toggleHabit = async (habitId: string) => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const newValue = !todayLogs[habitId];
+    setTodayLogs({ ...todayLogs, [habitId]: newValue });
+
+    await supabase.from('habit_logs').upsert({
+      habit_id: habitId,
+      client_id: user.id,
+      log_date: todayStr,
+      completed: newValue,
+    }, { onConflict: 'habit_id,log_date' });
+
+    fetchHabits();
+  };
+
+  const addCustomHabit = async () => {
+    if (!newHabitName.trim()) return;
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('habits')
+      .insert({
+        client_id: user.id,
+        name: newHabitName.trim(),
+        description: newHabitDescription.trim() || null,
+        is_active: true,
+      })
+      .select()
+      .single();
+
+    if (!error && data) {
+      setHabits([...habits, data]);
+      setNewHabitName('');
+      setNewHabitDescription('');
+      setShowHabitModal(false);
+    }
+  };
+
+  const deleteHabit = async (habitId: string) => {
+    if (!confirm('Delete this habit?')) return;
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await supabase.from('habits').update({ is_active: false }).eq('id', habitId);
+    setHabits(habits.filter(h => h.id !== habitId));
+  };
+
+  const addDefaultHabits = async () => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data } = await supabase
+      .from('habits')
+      .insert(defaultHabits.map(h => ({ client_id: user.id, name: h.name, description: h.description, is_active: true })))
+      .select();
+
+    if (data) setHabits(data);
+  };
+
+  const completedCount = Object.values(todayLogs).filter(Boolean).length;
+  const habitCompletionRate = habits.length > 0 ? Math.round((completedCount / habits.length) * 100) : 0;
+
   // Calculate key metrics
   const latestMeasurement = measurements.length > 0 ? measurements[measurements.length - 1] : null;
   const startingMeasurement = measurements.length > 0 ? measurements[0] : null;
@@ -345,18 +516,184 @@ export default function ProgressPage() {
   return (
     <div className="p-6 lg:p-8">
       {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-black">Progress Tracking</h1>
-          <p className="mt-2 text-grey-600">
-            Track your transformation journey with data and visuals
-          </p>
-        </div>
-        <Button onClick={() => setShowAddModal(true)} variant="primary">
-          <Plus className="mr-2 h-5 w-5" />
-          Log Measurement
-        </Button>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-black">Progress & Habits</h1>
+        <p className="mt-2 text-grey-600">
+          Track your transformation and build consistency
+        </p>
       </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-6 bg-grey-100 p-1 w-fit">
+        <button
+          onClick={() => setActiveTab('progress')}
+          className={`px-6 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'progress'
+              ? 'bg-white text-black shadow-sm'
+              : 'text-grey-600 hover:text-black'
+          }`}
+        >
+          <Scale className="h-4 w-4 inline mr-2" />
+          Progress
+        </button>
+        <button
+          onClick={() => setActiveTab('habits')}
+          className={`px-6 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'habits'
+              ? 'bg-white text-black shadow-sm'
+              : 'text-grey-600 hover:text-black'
+          }`}
+        >
+          <CheckSquare className="h-4 w-4 inline mr-2" />
+          Habits
+        </button>
+      </div>
+
+      {/* Habits Tab Content */}
+      {activeTab === 'habits' && (
+        <div className="space-y-6">
+          <div className="flex justify-end">
+            <Button onClick={() => setShowHabitModal(true)} variant="primary">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Habit
+            </Button>
+          </div>
+
+          {/* Habits Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white p-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-blue-600 flex items-center justify-center">
+                  <CheckCircle className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-grey-500">Today&apos;s Progress</p>
+                  <p className="text-2xl font-bold text-black">
+                    {habits.length > 0 ? `${completedCount}/${habits.length}` : '0/0'}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 h-2 bg-grey-200">
+                <div className="h-full bg-blue-600 transition-all" style={{ width: `${habitCompletionRate}%` }} />
+              </div>
+            </div>
+
+            <div className="bg-white p-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-orange-600 flex items-center justify-center">
+                  <Flame className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-grey-500">Current Streak</p>
+                  <p className="text-2xl font-bold text-black">{streak} {streak === 1 ? 'day' : 'days'}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-green-600 flex items-center justify-center">
+                  <TrendingUp className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-grey-500">This Week</p>
+                  <p className="text-2xl font-bold text-black">{weeklyPercentage}%</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Habits List */}
+          <div className="bg-white p-6">
+            <h2 className="text-lg font-bold text-black mb-6">Today&apos;s Habits</h2>
+            {habits.length === 0 ? (
+              <div className="text-center py-12">
+                <Calendar className="h-12 w-12 mx-auto text-grey-300 mb-4" />
+                <h3 className="text-lg font-semibold text-black mb-2">No habits yet</h3>
+                <p className="text-grey-500 mb-6">Start building your daily routine</p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button onClick={addDefaultHabits} variant="primary">Add Default Habits</Button>
+                  <Button onClick={() => setShowHabitModal(true)} variant="outline">Create Custom</Button>
+                </div>
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {habits.map((habit) => {
+                  const isCompleted = todayLogs[habit.id] || false;
+                  return (
+                    <li key={habit.id} className="group">
+                      <div className={`flex items-center gap-2 transition-colors ${isCompleted ? 'bg-green-50' : 'bg-grey-50 hover:bg-grey-100'}`}>
+                        <button onClick={() => toggleHabit(habit.id)} className="flex-1 flex items-center gap-4 p-4 text-left">
+                          <div className={`w-6 h-6 flex items-center justify-center border-2 transition-colors ${isCompleted ? 'bg-green-600 border-green-600' : 'border-grey-300'}`}>
+                            {isCompleted && <CheckCircle className="h-4 w-4 text-white" />}
+                          </div>
+                          <div className="flex-1">
+                            <p className={`font-medium ${isCompleted ? 'text-grey-500 line-through' : 'text-black'}`}>{habit.name}</p>
+                            {habit.description && <p className="text-sm text-grey-500 mt-0.5">{habit.description}</p>}
+                          </div>
+                        </button>
+                        <button onClick={() => deleteHabit(habit.id)} className="p-3 text-grey-400 hover:text-red-600 opacity-0 group-hover:opacity-100">
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          {/* Add Habit Modal */}
+          {showHabitModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white w-full max-w-md p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-bold text-black">Add Custom Habit</h3>
+                  <button onClick={() => setShowHabitModal(false)} className="text-grey-400 hover:text-black">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">Habit Name *</label>
+                    <input
+                      type="text"
+                      value={newHabitName}
+                      onChange={(e) => setNewHabitName(e.target.value)}
+                      placeholder="e.g., Read for 20 minutes"
+                      className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">Description (optional)</label>
+                    <input
+                      type="text"
+                      value={newHabitDescription}
+                      onChange={(e) => setNewHabitDescription(e.target.value)}
+                      placeholder="Add a short description..."
+                      className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                </div>
+                <div className="mt-6 flex gap-3">
+                  <Button onClick={() => setShowHabitModal(false)} variant="outline" className="flex-1">Cancel</Button>
+                  <Button onClick={addCustomHabit} variant="primary" className="flex-1">Add Habit</Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Progress Tab Content */}
+      {activeTab === 'progress' && (
+        <>
+          <div className="mb-8 flex justify-end">
+            <Button onClick={() => setShowAddModal(true)} variant="primary">
+              <Plus className="mr-2 h-5 w-5" />
+              Log Measurement
+            </Button>
+          </div>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
@@ -629,19 +966,19 @@ export default function ProgressPage() {
         </Card>
       </div>
 
-      {/* Add Measurement Modal */}
-      {showAddModal && (
-        <MeasurementModal
-          newMeasurement={newMeasurement}
-          setNewMeasurement={setNewMeasurement}
-          onSave={saveMeasurement}
-          onClose={() => setShowAddModal(false)}
-          saving={saving}
-        />
-      )}
+        {/* Add Measurement Modal */}
+        {showAddModal && (
+          <MeasurementModal
+            newMeasurement={newMeasurement}
+            setNewMeasurement={setNewMeasurement}
+            onSave={saveMeasurement}
+            onClose={() => setShowAddModal(false)}
+            saving={saving}
+          />
+        )}
 
-      {/* Photo Upload Modal */}
-      {showPhotoModal && (
+        {/* Photo Upload Modal */}
+        {showPhotoModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-md">
             <div className="p-6">
@@ -704,6 +1041,8 @@ export default function ProgressPage() {
             </div>
           </div>
         </div>
+        )}
+      </>
       )}
     </div>
   );

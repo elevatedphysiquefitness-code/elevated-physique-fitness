@@ -134,6 +134,9 @@ export default function RegisterPage() {
             We&apos;ve sent a confirmation link to <strong>{formData.email}</strong>.
             Please click the link to verify your account.
           </p>
+          <p className="mt-3 text-sm text-grey-500">
+            Don&apos;t see it? Check your <strong>Spam</strong> or <strong>Junk</strong> folder.
+          </p>
           <div className="mt-8">
             <Link
               href="/login"

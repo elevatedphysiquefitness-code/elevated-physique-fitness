@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Button from '@/components/ui/Button';
-import { Send, CheckCircle, ArrowRight } from 'lucide-react';
+import { Send, CheckCircle, ArrowRight, Loader2 } from 'lucide-react';
 
 const goals = [
   'Lose fat & get lean',
@@ -44,10 +44,29 @@ export default function ApplyPage() {
     whyElevated: '',
   });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    setSubmitting(true);
+
+    try {
+      const response = await fetch('/api/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (response.ok) {
+        setSubmitted(true);
+      } else {
+        alert('Something went wrong. Please try again or contact us directly.');
+      }
+    } catch (error) {
+      alert('Something went wrong. Please try again or contact us directly.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleChange = (
@@ -263,9 +282,18 @@ export default function ApplyPage() {
               </div>
 
               {/* Submit */}
-              <Button type="submit" variant="primary" size="lg" className="w-full">
-                Submit Application
-                <Send className="ml-2 h-5 w-5" />
+              <Button type="submit" variant="primary" size="lg" className="w-full" disabled={submitting}>
+                {submitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    Submit Application
+                    <Send className="ml-2 h-5 w-5" />
+                  </>
+                )}
               </Button>
 
               <p className="text-sm text-grey-500 text-center">

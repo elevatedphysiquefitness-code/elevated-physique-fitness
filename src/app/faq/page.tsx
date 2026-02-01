@@ -10,6 +10,10 @@ export const metadata: Metadata = {
 
 const faqs = [
   {
+    question: "I didn't receive my confirmation email. Where is it?",
+    answer: "If you don't see your confirmation email in your inbox, please check your Junk or Spam folder. Some email providers automatically filter new sender emails. If you still can't find it, contact us and we'll help you get set up.",
+  },
+  {
     question: 'Do you work with beginners?',
     answer: 'Absolutely. Many of my clients start with zero gym experience. I\'ll teach you proper form, build your confidence, and create a program that meets you exactly where you are. Everyone starts somewhere — what matters is that you start.',
   },

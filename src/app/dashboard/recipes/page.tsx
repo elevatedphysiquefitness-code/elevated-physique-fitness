@@ -1513,11 +1513,14 @@ export default function RecipesPage() {
           <Card key={recipe.id} className="overflow-hidden">
             {/* Recipe Header */}
             <div className="bg-gradient-to-r from-cinnamon to-chocolate p-6 text-white relative overflow-hidden">
-              {/* EP Pattern */}
+              {/* EP Logo Pattern */}
               <div
-                className="absolute inset-0 opacity-[0.06]"
+                className="absolute inset-0 opacity-[0.12]"
                 style={{
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='10' y='35' font-family='Arial, sans-serif' font-size='24' font-weight='bold' fill='%23ffffff'%3EEP%3C/text%3E%3Ctext x='50' y='70' font-family='Arial, sans-serif' font-size='24' font-weight='bold' fill='%23ffffff'%3EEP%3C/text%3E%3C/svg%3E")`,
+                  backgroundImage: `url("/ep-icon.png")`,
+                  backgroundSize: '50px 50px',
+                  backgroundRepeat: 'repeat',
+                  filter: 'brightness(2)',
                 }}
               />
               <div className="relative z-10">

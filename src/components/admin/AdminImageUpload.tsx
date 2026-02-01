@@ -11,6 +11,7 @@ interface AdminImageUploadProps {
   aspectRatio?: string; // e.g., 'aspect-square', 'aspect-video', 'aspect-[4/3]'
   placeholder?: React.ReactNode;
   alt?: string;
+  defaultImage?: string; // Default image URL to show if no custom image uploaded
 }
 
 export default function AdminImageUpload({
@@ -19,6 +20,7 @@ export default function AdminImageUpload({
   aspectRatio = 'aspect-square',
   placeholder,
   alt = 'Image',
+  defaultImage,
 }: AdminImageUploadProps) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -222,13 +224,14 @@ export default function AdminImageUpload({
   return (
     <div className={`relative ${aspectRatio} ${className} overflow-hidden group`}>
       {/* Image or Placeholder */}
-      {imageUrl ? (
+      {imageUrl || defaultImage ? (
         <Image
-          src={imageUrl}
+          src={imageUrl || defaultImage!}
           alt={alt}
           fill
           className="object-cover"
           sizes="(max-width: 768px) 100vw, 50vw"
+          unoptimized={!!(defaultImage && !imageUrl)} // Unoptimized for external URLs
         />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-br from-brown-200 to-brown-300 flex items-center justify-center">

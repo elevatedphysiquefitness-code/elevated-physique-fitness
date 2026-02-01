@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import { ToastProvider } from '@/components/ui/Toast';
+import InstallPrompt from '@/components/pwa/InstallPrompt';
 
 export default function DashboardLayout({
   children,
@@ -44,22 +46,25 @@ export default function DashboardLayout({
   }, []);
 
   return (
-    <div className="min-h-screen bg-grey-100 flex">
-      <DashboardSidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-      />
-      <div className="flex-1 flex flex-col min-w-0">
-        <DashboardHeader
-          onMenuClick={() => setSidebarOpen(true)}
-          userName={userName}
-          userId={userId}
-          avatarUrl={avatarUrl}
+    <ToastProvider>
+      <InstallPrompt />
+      <div className="min-h-screen bg-grey-100 flex">
+        <DashboardSidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
         />
-        <main className="flex-1 p-4 lg:p-6">
-          {children}
-        </main>
+        <div className="flex-1 flex flex-col min-w-0">
+          <DashboardHeader
+            onMenuClick={() => setSidebarOpen(true)}
+            userName={userName}
+            userId={userId}
+            avatarUrl={avatarUrl}
+          />
+          <main className="flex-1 p-4 lg:p-6">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </ToastProvider>
   );
 }
