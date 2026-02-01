@@ -17,6 +17,7 @@ import {
   Twitter,
   Facebook,
   MessageCircle,
+  Instagram,
 } from 'lucide-react';
 
 interface ReferralCode {
@@ -75,9 +76,8 @@ export default function ReferralsPage() {
       .eq('id', user.id)
       .single();
 
-    if (profile) {
-      setUserName(profile.full_name || 'Friend');
-    }
+    const fullName = profile?.full_name || 'Friend';
+    setUserName(fullName);
 
     // Get or create referral code
     let { data: codeData } = await supabase
@@ -87,8 +87,8 @@ export default function ReferralsPage() {
       .single();
 
     if (!codeData) {
-      // Generate unique code
-      const code = generateReferralCode(user.id);
+      // Generate unique code using person's name + 25
+      const code = generateReferralCode(fullName);
       const { data: newCode } = await supabase
         .from('referral_codes')
         .insert({
@@ -119,13 +119,11 @@ export default function ReferralsPage() {
     setLoading(false);
   };
 
-  const generateReferralCode = (userId: string) => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = 'EP';
-    for (let i = 0; i < 6; i++) {
-      code += chars[Math.floor(Math.random() * chars.length)];
-    }
-    return code;
+  const generateReferralCode = (fullName: string) => {
+    // Get first name, remove spaces and special characters, uppercase
+    const firstName = fullName.split(' ')[0].replace(/[^a-zA-Z]/g, '').toUpperCase();
+    // Return name + 25
+    return `${firstName}25`;
   };
 
   const getReferralLink = () => {
@@ -201,6 +199,26 @@ export default function ReferralsPage() {
   const shareViaText = () => {
     const text = `Hey! I've been using Elevated Physique Fitness and it's been amazing. Use my link to get ${REFERRAL_DISCOUNT}% off: ${getReferralLink()}`;
     window.open(`sms:?body=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  const shareOnInstagram = async () => {
+    const text = `I've been loving my fitness journey with Elevated Physique Fitness! 💪
+
+Use my code "${referralCode?.code}" to get ${REFERRAL_DISCOUNT}% off your first month!
+
+${getReferralLink()}
+
+#ElevatedPhysique #FitnessJourney #PersonalTraining`;
+
+    // Copy to clipboard first
+    await navigator.clipboard.writeText(text);
+
+    // Show copied feedback
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
+
+    // Open Instagram (will open app on mobile or website on desktop)
+    window.open('https://www.instagram.com/', '_blank');
   };
 
   const getStatusBadge = (status: string) => {
@@ -337,6 +355,13 @@ export default function ReferralsPage() {
               </p>
 
               <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={shareOnInstagram}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#833AB4] via-[#FD1D1D] to-[#F77737] text-white rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  <Instagram className="h-4 w-4" />
+                  Instagram
+                </button>
                 <button
                   onClick={shareOnTwitter}
                   className="flex items-center gap-2 px-4 py-2 bg-[#1DA1F2] text-white rounded-lg hover:opacity-90 transition-opacity"
