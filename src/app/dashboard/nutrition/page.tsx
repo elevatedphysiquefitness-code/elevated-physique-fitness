@@ -322,6 +322,10 @@ export default function NutritionPage() {
 
   const today = new Date().toISOString().split('T')[0];
   const [selectedDate, setSelectedDate] = useState(today);
+  const [activeTab, setActiveTab] = useState<'log' | 'history'>('log');
+  const [historyLogs, setHistoryLogs] = useState<FoodLog[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyRange, setHistoryRange] = useState<'week' | 'month' | 'all'>('week');
 
   const formatDateDisplay = (dateStr: string) => {
     const date = new Date(dateStr + 'T00:00:00');
@@ -436,6 +440,72 @@ export default function NutritionPage() {
     if (error) {
       console.error('Error fetching food logs:', error);
     }
+  };
+
+  const fetchHistoryLogs = async (clientId: string, range: 'week' | 'month' | 'all') => {
+    setHistoryLoading(true);
+    const supabase = createClient();
+
+    let startDate = '';
+    const now = new Date();
+
+    if (range === 'week') {
+      const weekAgo = new Date(now);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      startDate = weekAgo.toISOString().split('T')[0];
+    } else if (range === 'month') {
+      const monthAgo = new Date(now);
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      startDate = monthAgo.toISOString().split('T')[0];
+    }
+
+    let query = supabase
+      .from('food_logs')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('log_date', { ascending: false })
+      .order('logged_at', { ascending: true });
+
+    if (startDate) {
+      query = query.gte('log_date', startDate);
+    }
+
+    const { data, error } = await query;
+
+    if (data) {
+      setHistoryLogs(data);
+    }
+    if (error) {
+      console.error('Error fetching history logs:', error);
+    }
+    setHistoryLoading(false);
+  };
+
+  // Fetch history when tab changes or range changes
+  useEffect(() => {
+    if (activeTab === 'history' && userId) {
+      fetchHistoryLogs(userId, historyRange);
+    }
+  }, [activeTab, historyRange, userId]);
+
+  // Group history logs by date
+  const groupedHistoryLogs = historyLogs.reduce((acc, log) => {
+    if (!acc[log.log_date]) acc[log.log_date] = [];
+    acc[log.log_date].push(log);
+    return acc;
+  }, {} as Record<string, FoodLog[]>);
+
+  // Calculate daily totals for history
+  const calculateDayTotals = (logs: FoodLog[]) => {
+    return logs.reduce(
+      (acc, log) => ({
+        calories: acc.calories + (log.calories || 0),
+        protein: acc.protein + (log.protein || 0),
+        carbs: acc.carbs + (log.carbs || 0),
+        fat: acc.fat + (log.fat || 0),
+      }),
+      { calories: 0, protein: 0, carbs: 0, fat: 0 }
+    );
   };
 
   // Calculate consumed macros from food logs
@@ -893,9 +963,41 @@ export default function NutritionPage() {
       {macros && (
         <Card>
           <CardContent className="p-6">
+            {/* Tab Navigation */}
+            <div className="flex items-center gap-4 mb-6 border-b border-grey-200">
+              <button
+                onClick={() => setActiveTab('log')}
+                className={`pb-3 px-1 font-medium text-sm transition-colors relative ${
+                  activeTab === 'log'
+                    ? 'text-chocolate'
+                    : 'text-grey-500 hover:text-grey-700'
+                }`}
+              >
+                Daily Log
+                {activeTab === 'log' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-chocolate" />
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab('history')}
+                className={`pb-3 px-1 font-medium text-sm transition-colors relative ${
+                  activeTab === 'history'
+                    ? 'text-chocolate'
+                    : 'text-grey-500 hover:text-grey-700'
+                }`}
+              >
+                History
+                {activeTab === 'history' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-chocolate" />
+                )}
+              </button>
+            </div>
+
+            {activeTab === 'log' ? (
+              <>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-600 flex items-center justify-center">
+                <div className="w-10 h-10 bg-chocolate flex items-center justify-center">
                   <UtensilsCrossed className="h-5 w-5 text-white" />
                 </div>
                 <div>
@@ -1022,6 +1124,139 @@ export default function NutritionPage() {
                     ? 'No foods logged yet today. Click "Log Food" to start tracking.'
                     : `No foods logged for ${formatDateDisplay(selectedDate)}.`}
                 </p>
+              </div>
+            )}
+              </>
+            ) : (
+              /* History Tab Content */
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-chocolate flex items-center justify-center">
+                      <Calendar className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-black">Food History</h2>
+                      <p className="text-sm text-grey-500">View your past food logs</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {(['week', 'month', 'all'] as const).map((range) => (
+                      <button
+                        key={range}
+                        onClick={() => setHistoryRange(range)}
+                        className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                          historyRange === range
+                            ? 'bg-chocolate text-white'
+                            : 'bg-grey-100 text-grey-600 hover:bg-grey-200'
+                        }`}
+                      >
+                        {range === 'week' ? '7 Days' : range === 'month' ? '30 Days' : 'All Time'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {historyLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-chocolate" />
+                  </div>
+                ) : Object.keys(groupedHistoryLogs).length > 0 ? (
+                  <div className="space-y-4">
+                    {Object.entries(groupedHistoryLogs)
+                      .sort(([a], [b]) => b.localeCompare(a))
+                      .map(([date, logs]) => {
+                        const dayTotals = calculateDayTotals(logs);
+                        const dateObj = new Date(date + 'T00:00:00');
+                        const formattedDate = dateObj.toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          month: 'short',
+                          day: 'numeric',
+                        });
+
+                        return (
+                          <div key={date} className="border border-grey-200 rounded-lg overflow-hidden">
+                            <div className="bg-grey-50 px-4 py-3 flex items-center justify-between">
+                              <div>
+                                <p className="font-semibold text-black">{formattedDate}</p>
+                                <p className="text-xs text-grey-500">{logs.length} items logged</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-chocolate">{dayTotals.calories} cal</p>
+                                <p className="text-xs text-grey-500">
+                                  P: {Math.round(dayTotals.protein)}g · C: {Math.round(dayTotals.carbs)}g · F: {Math.round(dayTotals.fat)}g
+                                </p>
+                              </div>
+                            </div>
+                            <div className="divide-y divide-grey-100">
+                              {logs.map((log) => (
+                                <div key={log.id} className="px-4 py-2 flex items-center justify-between">
+                                  <div>
+                                    <p className="text-sm font-medium text-black">{log.food_name}</p>
+                                    <p className="text-xs text-grey-500">
+                                      {mealTypeLabels[log.meal_type || 'other']}
+                                      {log.serving_size && ` · ${log.serving_size}`}
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-sm font-semibold text-black">{log.calories} cal</p>
+                                    <p className="text-xs text-grey-400">
+                                      P: {log.protein}g · C: {log.carbs}g · F: {log.fat}g
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                    {/* Summary Stats */}
+                    <div className="bg-chocolate text-white p-4 rounded-lg">
+                      <p className="font-semibold mb-2">
+                        {historyRange === 'week' ? '7-Day' : historyRange === 'month' ? '30-Day' : 'All Time'} Summary
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                        <div>
+                          <p className="text-2xl font-bold">
+                            {Math.round(historyLogs.reduce((sum, l) => sum + (l.calories || 0), 0) / Object.keys(groupedHistoryLogs).length)}
+                          </p>
+                          <p className="text-xs text-biscotti">Avg Cal/Day</p>
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold">
+                            {Math.round(historyLogs.reduce((sum, l) => sum + (l.protein || 0), 0) / Object.keys(groupedHistoryLogs).length)}g
+                          </p>
+                          <p className="text-xs text-biscotti">Avg Protein</p>
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold">{Object.keys(groupedHistoryLogs).length}</p>
+                          <p className="text-xs text-biscotti">Days Logged</p>
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold">{historyLogs.length}</p>
+                          <p className="text-xs text-biscotti">Total Entries</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-12 bg-grey-50 rounded-lg">
+                    <Calendar className="h-12 w-12 mx-auto text-grey-300 mb-3" />
+                    <p className="text-grey-600 font-medium">No food history yet</p>
+                    <p className="text-grey-500 text-sm mt-1">
+                      Start logging your meals to see your history here
+                    </p>
+                    <Button
+                      onClick={() => setActiveTab('log')}
+                      variant="primary"
+                      className="mt-4"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Log Your First Meal
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
