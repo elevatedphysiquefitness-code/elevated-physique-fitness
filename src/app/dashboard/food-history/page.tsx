@@ -556,6 +556,18 @@ export default function FoodHistoryPage() {
               if (date === today) dateLabel = 'Today';
               else if (date === yesterday) dateLabel = 'Yesterday';
 
+              // Calculate remaining for this day
+              const remainingCal = macros ? Math.max(0, macros.calories - dayTotals.calories) : 0;
+              const remainingP = macros ? Math.max(0, macros.protein - dayTotals.protein) : 0;
+              const remainingC = macros ? Math.max(0, macros.carbs - dayTotals.carbs) : 0;
+              const remainingF = macros ? Math.max(0, macros.fats - dayTotals.fat) : 0;
+
+              // Calculate percentages
+              const calPct = macros ? Math.min(100, Math.round((dayTotals.calories / macros.calories) * 100)) : 0;
+              const pPct = macros ? Math.min(100, Math.round((dayTotals.protein / macros.protein) * 100)) : 0;
+              const cPct = macros ? Math.min(100, Math.round((dayTotals.carbs / macros.carbs) * 100)) : 0;
+              const fPct = macros ? Math.min(100, Math.round((dayTotals.fat / macros.fats) * 100)) : 0;
+
               return (
                 <Card key={date} className="overflow-hidden">
                   <button
@@ -583,24 +595,83 @@ export default function FoodHistoryPage() {
                   </button>
 
                   {isExpanded && (
-                    <div className="border-t border-grey-200 divide-y divide-grey-100">
-                      {logs.map((log) => (
-                        <div key={log.id} className="px-4 py-3 flex items-center justify-between bg-grey-50">
-                          <div>
-                            <p className="font-medium text-black">{log.food_name}</p>
-                            <p className="text-xs text-grey-500">
-                              {mealTypeLabels[log.meal_type || 'other']}
-                              {log.serving_size && ` · ${log.servings} × ${log.serving_size}`}
-                            </p>
+                    <div className="border-t border-grey-200">
+                      {/* Daily Progress vs Target */}
+                      {macros && (
+                        <div className="p-4 bg-grey-50 border-b border-grey-200">
+                          <p className="text-xs font-semibold text-grey-600 mb-3">DAILY PROGRESS vs TARGET</p>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span className="text-orange-600 font-medium">Calories</span>
+                                <span className="text-grey-500">{calPct}%</span>
+                              </div>
+                              <div className="h-2 bg-orange-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-orange-500 transition-all" style={{ width: `${calPct}%` }} />
+                              </div>
+                              <p className="text-xs text-grey-600 mt-1">{dayTotals.calories} / {macros.calories}</p>
+                            </div>
+                            <div>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span className="text-red-600 font-medium">Protein</span>
+                                <span className="text-grey-500">{pPct}%</span>
+                              </div>
+                              <div className="h-2 bg-red-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-red-500 transition-all" style={{ width: `${pPct}%` }} />
+                              </div>
+                              <p className="text-xs text-grey-600 mt-1">{Math.round(dayTotals.protein)}g / {macros.protein}g</p>
+                            </div>
+                            <div>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span className="text-yellow-600 font-medium">Carbs</span>
+                                <span className="text-grey-500">{cPct}%</span>
+                              </div>
+                              <div className="h-2 bg-yellow-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-yellow-500 transition-all" style={{ width: `${cPct}%` }} />
+                              </div>
+                              <p className="text-xs text-grey-600 mt-1">{Math.round(dayTotals.carbs)}g / {macros.carbs}g</p>
+                            </div>
+                            <div>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span className="text-green-600 font-medium">Fat</span>
+                                <span className="text-grey-500">{fPct}%</span>
+                              </div>
+                              <div className="h-2 bg-green-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-green-500 transition-all" style={{ width: `${fPct}%` }} />
+                              </div>
+                              <p className="text-xs text-grey-600 mt-1">{Math.round(dayTotals.fat)}g / {macros.fats}g</p>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p className="font-semibold text-black">{log.calories} cal</p>
-                            <p className="text-xs text-grey-400">
-                              P: {log.protein}g · C: {log.carbs}g · F: {log.fat}g
-                            </p>
+                          <div className="mt-3 pt-3 border-t border-grey-200 flex flex-wrap gap-3 text-xs">
+                            <span className="text-grey-500 font-medium">Remaining:</span>
+                            <span className="text-orange-600">{remainingCal} cal</span>
+                            <span className="text-red-600">{Math.round(remainingP)}g P</span>
+                            <span className="text-yellow-600">{Math.round(remainingC)}g C</span>
+                            <span className="text-green-600">{Math.round(remainingF)}g F</span>
                           </div>
                         </div>
-                      ))}
+                      )}
+
+                      {/* Food items */}
+                      <div className="divide-y divide-grey-100">
+                        {logs.map((log) => (
+                          <div key={log.id} className="px-4 py-3 flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-black">{log.food_name}</p>
+                              <p className="text-xs text-grey-500">
+                                {mealTypeLabels[log.meal_type || 'other']}
+                                {log.serving_size && ` · ${log.servings} × ${log.serving_size}`}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold text-black">{log.calories} cal</p>
+                              <p className="text-xs text-grey-400">
+                                P: {log.protein}g · C: {log.carbs}g · F: {log.fat}g
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </Card>
