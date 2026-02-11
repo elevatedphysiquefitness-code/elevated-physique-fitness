@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { Plus, Edit, Trash2, Users, Calendar } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Calendar, Copy } from 'lucide-react';
 import Button from '@/components/ui/Button';
 
 interface Program {
@@ -25,6 +25,7 @@ export default function ProgramsPage() {
     duration_weeks: 12,
   });
   const [saving, setSaving] = useState(false);
+  const [duplicating, setDuplicating] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPrograms();
@@ -95,6 +96,95 @@ export default function ProgramsPage() {
     setPrograms(programs.filter((p) => p.id !== id));
   };
 
+  const duplicateProgram = async (programId: string, title: string) => {
+    setDuplicating(programId);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // 1. Get the original program
+    const { data: originalProgram } = await supabase
+      .from('workout_programs')
+      .select('*')
+      .eq('id', programId)
+      .single();
+
+    if (!originalProgram) {
+      alert('Failed to find original program.');
+      setDuplicating(null);
+      return;
+    }
+
+    // 2. Create new program with "Copy of" prefix
+    const { data: newProgram, error: programError } = await supabase
+      .from('workout_programs')
+      .insert({
+        title: `Copy of ${title}`,
+        description: originalProgram.description,
+        duration_weeks: originalProgram.duration_weeks,
+        program_type: originalProgram.program_type,
+        days_per_week: originalProgram.days_per_week,
+        created_by: user?.id,
+      })
+      .select()
+      .single();
+
+    if (programError || !newProgram) {
+      alert('Failed to duplicate program.');
+      console.error('Error duplicating program:', programError);
+      setDuplicating(null);
+      return;
+    }
+
+    // 3. Get all workout templates for original program
+    const { data: templates } = await supabase
+      .from('workout_templates')
+      .select(`
+        *,
+        workout_template_exercises (*)
+      `)
+      .eq('program_id', programId);
+
+    if (templates && templates.length > 0) {
+      // 4. Copy each template and its exercises
+      for (const template of templates) {
+        const { data: newTemplate } = await supabase
+          .from('workout_templates')
+          .insert({
+            program_id: newProgram.id,
+            name: template.name,
+            title: template.title,
+            focus: template.focus,
+            description: template.description,
+            duration_minutes: template.duration_minutes,
+            day_number: template.day_number,
+            created_by: user?.id,
+          })
+          .select()
+          .single();
+
+        if (newTemplate && template.workout_template_exercises?.length > 0) {
+          // Copy exercises to new template
+          const exerciseCopies = template.workout_template_exercises.map((ex: any) => ({
+            template_id: newTemplate.id,
+            exercise_id: ex.exercise_id,
+            sets: ex.sets,
+            reps: ex.reps,
+            rest_seconds: ex.rest_seconds,
+            notes: ex.notes,
+            order_index: ex.order_index,
+          }));
+
+          await supabase.from('workout_template_exercises').insert(exerciseCopies);
+        }
+      }
+    }
+
+    // Add to programs list
+    setPrograms([{ ...newProgram, client_count: 0 }, ...programs]);
+    setDuplicating(null);
+    alert(`Program duplicated as "Copy of ${title}"`);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -124,6 +214,18 @@ export default function ProgramsPage() {
             <div className="flex items-start justify-between mb-4">
               <h3 className="font-bold text-black">{program.title}</h3>
               <div className="flex gap-1">
+                <button
+                  onClick={() => duplicateProgram(program.id, program.title)}
+                  disabled={duplicating === program.id}
+                  className="p-2 text-grey-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50"
+                  title="Duplicate program"
+                >
+                  {duplicating === program.id ? (
+                    <div className="h-4 w-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </button>
                 <Link
                   href={`/admin/programs/${program.id}`}
                   className="p-2 text-grey-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
