@@ -40,7 +40,7 @@ interface WorkoutExercise {
   reps: string;
   rest_seconds: number;
   notes: string;
-  exercise: Exercise[];
+  exercise: Exercise | Exercise[];
 }
 
 interface WorkoutTemplate {
@@ -106,6 +106,12 @@ interface PersonalRecord {
 const getTemplate = (workout: any): WorkoutTemplate | null => {
   if (!workout?.template) return null;
   return Array.isArray(workout.template) ? workout.template[0] : workout.template;
+};
+
+// Helper to get exercise (handles both object and array formats from Supabase)
+const getExercise = (workoutExercise: any): Exercise | null => {
+  if (!workoutExercise?.exercise) return null;
+  return Array.isArray(workoutExercise.exercise) ? workoutExercise.exercise[0] : workoutExercise.exercise;
 };
 
 export default function WorkoutsPage() {
@@ -384,8 +390,8 @@ export default function WorkoutsPage() {
 
     // Initialize exercise logs with empty sets
     const logs: ExerciseLog[] = workoutExercises.map(we => ({
-      exerciseId: we.exercise?.[0]?.id || '',
-      exerciseName: we.exercise?.[0]?.name || '',
+      exerciseId: getExercise(we)?.id || '',
+      exerciseName: getExercise(we)?.name || '',
       sets: Array.from({ length: we.sets }, (_, i) => ({
         setNumber: i + 1,
         weight: '',
@@ -400,7 +406,7 @@ export default function WorkoutsPage() {
 
     // Fetch previous workout logs for these exercises
     const exerciseIds = workoutExercises
-      .map(we => we.exercise?.[0]?.id)
+      .map(we => getExercise(we)?.id)
       .filter(Boolean);
 
     if (exerciseIds.length > 0) {
@@ -740,7 +746,7 @@ export default function WorkoutsPage() {
 
                   <div className="divide-y divide-grey-200">
                     {workoutExercises.map((we, index) => {
-                      const exerciseId = we.exercise?.[0]?.id;
+                      const exerciseId = getExercise(we)?.id;
                       const prevExerciseLogs = exerciseId ? previousLogs[exerciseId] : [];
                       const exercisePRs = exerciseId ? personalRecords[exerciseId] : [];
                       const currentMaxPR = exercisePRs?.find(pr => pr.record_type === 'max_weight');
@@ -765,7 +771,7 @@ export default function WorkoutsPage() {
                               </div>
                               <div className="text-left">
                                 <div className="flex items-center gap-2">
-                                  <p className="font-semibold text-black">{we.exercise?.[0]?.name}</p>
+                                  <p className="font-semibold text-black">{getExercise(we)?.name}</p>
                                   {currentMaxPR && (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs font-medium rounded">
                                       <Trophy className="h-3 w-3" />
@@ -912,9 +918,9 @@ export default function WorkoutsPage() {
                                   </p>
                                 </div>
                               )}
-                              {we.exercise?.[0]?.youtube_url && (
+                              {getExercise(we)?.youtube_url && (
                                 <a
-                                  href={we.exercise[0].youtube_url.replace('/embed/', '/watch?v=')}
+                                  href={getExercise(we)!.youtube_url.replace('/embed/', '/watch?v=')}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="inline-flex items-center gap-2 text-blue-600 text-sm font-medium hover:underline"
