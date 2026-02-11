@@ -56,7 +56,7 @@ interface AssignedWorkout {
   workout_date: string;
   status: 'scheduled' | 'completed' | 'skipped' | 'rest';
   notes: string;
-  template: WorkoutTemplate[] | null;
+  template: WorkoutTemplate | WorkoutTemplate[] | null;
 }
 
 interface ClientProgram {
@@ -101,6 +101,12 @@ interface PersonalRecord {
   reps: number;
   achieved_date: string;
 }
+
+// Helper to get template (handles both object and array formats from Supabase)
+const getTemplate = (workout: any): WorkoutTemplate | null => {
+  if (!workout?.template) return null;
+  return Array.isArray(workout.template) ? workout.template[0] : workout.template;
+};
 
 export default function WorkoutsPage() {
   const [loading, setLoading] = useState(true);
@@ -221,7 +227,7 @@ export default function WorkoutsPage() {
         setSelectedWorkout(null);
       } else {
         // For past/future weeks, select first workout with a template
-        const firstWorkout = weekWorkouts.find(w => w.template?.[0]) || weekWorkouts[0];
+        const firstWorkout = weekWorkouts.find(w => getTemplate(w)) || weekWorkouts[0];
         workoutToShow = firstWorkout as AssignedWorkout || null;
         setTodayWorkout(null);
         setSelectedWorkout(workoutToShow);
@@ -229,7 +235,7 @@ export default function WorkoutsPage() {
 
       // Fetch exercises for the workout to display
       if (workoutToShow) {
-        const templateData = workoutToShow.template?.[0];
+        const templateData = getTemplate(workoutToShow);
         if (templateData) {
           const { data: exercises } = await supabase
             .from('workout_template_exercises')
@@ -299,7 +305,7 @@ export default function WorkoutsPage() {
     setExpandedExercise(null);
 
     // Fetch exercises for selected workout
-    const templateData = workout.template?.[0];
+    const templateData = getTemplate(workout);
     if (templateData) {
       const supabase = createClient();
       const { data: exercises } = await supabase
@@ -688,19 +694,19 @@ export default function WorkoutsPage() {
                           : getDayName(displayWorkout.workout_date)}
                     </p>
                     <h2 className="text-2xl font-bold mt-1">
-                      {displayWorkout.template?.[0]?.name || 'Rest Day'}
+                      {getTemplate(displayWorkout)?.name || 'Rest Day'}
                     </h2>
-                    {displayWorkout.template?.[0]?.focus && (
+                    {getTemplate(displayWorkout)?.focus && (
                       <p className={displayWorkout.status === 'completed' ? 'text-green-200 mt-2' : 'text-blue-200 mt-2'}>
-                        {displayWorkout.template[0].focus}
+                        {getTemplate(displayWorkout)?.focus}
                       </p>
                     )}
                   </div>
-                  {displayWorkout.template?.[0] && (
+                  {getTemplate(displayWorkout) && (
                     <div className="text-right">
                       <div className="flex items-center gap-2 text-blue-100">
                         <Clock className="h-4 w-4" />
-                        <span>{displayWorkout.template[0].duration_minutes} min</span>
+                        <span>{getTemplate(displayWorkout)?.duration_minutes} min</span>
                       </div>
                       <div className="flex items-center gap-2 text-blue-100 mt-1">
                         <Dumbbell className="h-4 w-4" />
@@ -1036,7 +1042,7 @@ export default function WorkoutsPage() {
                               {isTodayWorkout && ' (Today)'}
                             </p>
                             <p className={`text-xs ${workout.status === 'rest' ? 'text-grey-400' : 'text-grey-500'}`}>
-                              {workout.template?.[0]?.name || 'Rest'}
+                              {getTemplate(workout)?.name || 'Rest'}
                             </p>
                           </div>
                         </div>
