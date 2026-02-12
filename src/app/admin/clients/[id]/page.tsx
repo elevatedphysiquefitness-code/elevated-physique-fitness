@@ -25,6 +25,14 @@ import {
   Utensils,
   Activity,
   TrendingUp,
+  Droplets,
+  Moon,
+  CheckSquare,
+  FileText,
+  Star,
+  CreditCard,
+  Edit,
+  DollarSign,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -119,6 +127,66 @@ interface WorkoutLog {
   is_pr: boolean;
 }
 
+interface WaterLog {
+  log_date: string;
+  total_oz: number;
+}
+
+interface SleepLog {
+  log_date: string;
+  hours_slept: number;
+  sleep_quality: number;
+}
+
+interface HabitLog {
+  log_date: string;
+  habit_name: string;
+  completed: boolean;
+}
+
+interface CheckIn {
+  id: string;
+  submitted_at: string;
+  energy_level: number | null;
+  stress_level: number | null;
+  sleep_quality: number | null;
+  notes: string | null;
+}
+
+interface Subscription {
+  id: string;
+  user_id: string;
+  plan_type: string;
+  plan_name: string;
+  billing_interval: string;
+  status: string;
+  start_date: string;
+  next_billing_date: string | null;
+  price: number | null;
+  payment_method: string | null;
+  notes: string | null;
+}
+
+interface WorkoutTemplate {
+  id: string;
+  name: string;
+  title: string;
+  focus: string | null;
+}
+
+interface WeeklySchedule {
+  sunday: string | null;
+  monday: string | null;
+  tuesday: string | null;
+  wednesday: string | null;
+  thursday: string | null;
+  friday: string | null;
+  saturday: string | null;
+}
+
+const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+const dayLabels = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 export default function ClientDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -154,6 +222,49 @@ export default function ClientDetailPage() {
   const [workoutLogDays, setWorkoutLogDays] = useState(30);
   const [loadingMoreFood, setLoadingMoreFood] = useState(false);
   const [loadingMoreWorkouts, setLoadingMoreWorkouts] = useState(false);
+
+  // Water, Sleep, Habits, Check-ins
+  const [waterLogs, setWaterLogs] = useState<WaterLog[]>([]);
+  const [sleepLogs, setSleepLogs] = useState<SleepLog[]>([]);
+  const [habitLogs, setHabitLogs] = useState<HabitLog[]>([]);
+  const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
+
+  // Workout edit state
+  const [editingWorkout, setEditingWorkout] = useState<AssignedWorkout | null>(null);
+  const [editWorkoutDate, setEditWorkoutDate] = useState('');
+  const [showEditWorkoutModal, setShowEditWorkoutModal] = useState(false);
+  const [selectedWorkoutIds, setSelectedWorkoutIds] = useState<Set<string>>(new Set());
+  const [selectMode, setSelectMode] = useState(false);
+
+  // Weekly schedule editor state
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [availableTemplates, setAvailableTemplates] = useState<WorkoutTemplate[]>([]);
+  const [weeklySchedule, setWeeklySchedule] = useState<WeeklySchedule>({
+    sunday: null,
+    monday: null,
+    tuesday: null,
+    wednesday: null,
+    thursday: null,
+    friday: null,
+    saturday: null,
+  });
+  const [scheduleStartDate, setScheduleStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [scheduleWeeks, setScheduleWeeks] = useState(4);
+
+  // Subscription management
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [subscriptionForm, setSubscriptionForm] = useState({
+    plan_type: 'online',
+    plan_name: '',
+    billing_interval: 'monthly',
+    status: 'active',
+    start_date: new Date().toISOString().split('T')[0],
+    next_billing_date: '',
+    price: '',
+    payment_method: 'external',
+    notes: '',
+  });
 
   useEffect(() => {
     fetchClientData();
@@ -343,6 +454,89 @@ export default function ClientDetailPage() {
 
     // Fetch workout logs (last 30 days by default)
     await fetchWorkoutLogs(supabase, clientId, 30);
+
+    // Fetch water logs (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const startDateStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+    const { data: waterData } = await supabase
+      .from('water_logs')
+      .select('log_date, amount_oz')
+      .eq('client_id', clientId)
+      .gte('log_date', startDateStr)
+      .order('log_date', { ascending: false });
+
+    if (waterData) {
+      // Group by date and sum
+      const waterByDate: Record<string, number> = {};
+      waterData.forEach((log: any) => {
+        waterByDate[log.log_date] = (waterByDate[log.log_date] || 0) + (log.amount_oz || 0);
+      });
+      setWaterLogs(Object.entries(waterByDate).map(([log_date, total_oz]) => ({
+        log_date,
+        total_oz,
+      })).sort((a, b) => b.log_date.localeCompare(a.log_date)));
+    }
+
+    // Fetch sleep logs (last 30 days)
+    const { data: sleepData } = await supabase
+      .from('sleep_logs')
+      .select('log_date, hours_slept, sleep_quality')
+      .eq('client_id', clientId)
+      .gte('log_date', startDateStr)
+      .order('log_date', { ascending: false });
+
+    if (sleepData) {
+      setSleepLogs(sleepData);
+    }
+
+    // Fetch habit logs (last 14 days)
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    const { data: habitData } = await supabase
+      .from('habit_logs')
+      .select(`
+        log_date,
+        completed,
+        habits (name)
+      `)
+      .eq('client_id', clientId)
+      .gte('log_date', fourteenDaysAgo.toISOString().split('T')[0])
+      .order('log_date', { ascending: false });
+
+    if (habitData) {
+      setHabitLogs(habitData.map((h: any) => ({
+        log_date: h.log_date,
+        habit_name: h.habits?.name || 'Unknown Habit',
+        completed: h.completed,
+      })));
+    }
+
+    // Fetch check-ins (last 10)
+    const { data: checkInData } = await supabase
+      .from('check_ins')
+      .select('id, submitted_at, energy_level, stress_level, sleep_quality, notes')
+      .eq('client_id', clientId)
+      .order('submitted_at', { ascending: false })
+      .limit(10);
+
+    if (checkInData) {
+      setCheckIns(checkInData);
+    }
+
+    // Fetch subscription
+    const { data: subData } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', clientId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (subData) {
+      setSubscription(subData);
+    }
 
     setLoading(false);
   };
@@ -582,6 +776,324 @@ export default function ClientDetailPage() {
     setSaving(false);
   };
 
+  const openEditWorkoutModal = (workout: AssignedWorkout) => {
+    setEditingWorkout(workout);
+    setEditWorkoutDate(workout.workout_date);
+    setShowEditWorkoutModal(true);
+  };
+
+  const updateWorkoutDate = async () => {
+    if (!editingWorkout || !editWorkoutDate) return;
+
+    setSaving(true);
+    const supabase = createClient();
+
+    const { error } = await supabase
+      .from('assigned_workouts')
+      .update({ workout_date: editWorkoutDate })
+      .eq('id', editingWorkout.id);
+
+    if (error) {
+      console.error('Error updating workout date:', error);
+      alert('Failed to update workout date');
+    } else {
+      setShowEditWorkoutModal(false);
+      setEditingWorkout(null);
+      fetchClientData();
+      alert('Workout date updated!');
+    }
+
+    setSaving(false);
+  };
+
+  const deleteWorkout = async (workoutId: string) => {
+    if (!confirm('Are you sure you want to delete this workout?')) return;
+
+    const supabase = createClient();
+
+    const { error } = await supabase
+      .from('assigned_workouts')
+      .delete()
+      .eq('id', workoutId);
+
+    if (error) {
+      console.error('Error deleting workout:', error);
+      alert('Failed to delete workout');
+    } else {
+      setAssignedWorkouts(assignedWorkouts.filter(w => w.id !== workoutId));
+      alert('Workout deleted!');
+    }
+  };
+
+  const toggleWorkoutSelection = (workoutId: string) => {
+    const newSelected = new Set(selectedWorkoutIds);
+    if (newSelected.has(workoutId)) {
+      newSelected.delete(workoutId);
+    } else {
+      newSelected.add(workoutId);
+    }
+    setSelectedWorkoutIds(newSelected);
+  };
+
+  const selectAllWorkouts = () => {
+    if (selectedWorkoutIds.size === assignedWorkouts.length) {
+      setSelectedWorkoutIds(new Set());
+    } else {
+      setSelectedWorkoutIds(new Set(assignedWorkouts.map(w => w.id)));
+    }
+  };
+
+  const deleteSelectedWorkouts = async () => {
+    if (selectedWorkoutIds.size === 0) return;
+
+    if (!confirm(`Are you sure you want to delete ${selectedWorkoutIds.size} workout(s)?`)) return;
+
+    setSaving(true);
+    const supabase = createClient();
+
+    const { error } = await supabase
+      .from('assigned_workouts')
+      .delete()
+      .in('id', Array.from(selectedWorkoutIds));
+
+    if (error) {
+      console.error('Error deleting workouts:', error);
+      alert('Failed to delete some workouts');
+    } else {
+      setAssignedWorkouts(assignedWorkouts.filter(w => !selectedWorkoutIds.has(w.id)));
+      setSelectedWorkoutIds(new Set());
+      setSelectMode(false);
+      alert(`${selectedWorkoutIds.size} workout(s) deleted!`);
+    }
+
+    setSaving(false);
+  };
+
+  const cancelSelectMode = () => {
+    setSelectMode(false);
+    setSelectedWorkoutIds(new Set());
+  };
+
+  const openScheduleModal = async () => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Fetch all workout templates (both global and client-specific)
+    const { data: templates } = await supabase
+      .from('workout_templates')
+      .select('id, name, title, focus')
+      .or(`created_by.eq.${user?.id},created_for_client_id.eq.${clientId},created_for_client_id.is.null`)
+      .order('name');
+
+    if (templates) {
+      setAvailableTemplates(templates.map(t => ({
+        ...t,
+        name: t.name || t.title || 'Unnamed Workout',
+      })));
+    }
+
+    // Reset schedule
+    setWeeklySchedule({
+      sunday: null,
+      monday: null,
+      tuesday: null,
+      wednesday: null,
+      thursday: null,
+      friday: null,
+      saturday: null,
+    });
+    setScheduleStartDate(new Date().toISOString().split('T')[0]);
+    setScheduleWeeks(4);
+    setShowScheduleModal(true);
+  };
+
+  const generateSchedule = async () => {
+    // Check if at least one day has a workout
+    const hasWorkouts = Object.values(weeklySchedule).some(v => v !== null);
+    if (!hasWorkouts) {
+      alert('Please assign at least one workout to a day of the week.');
+      return;
+    }
+
+    setSaving(true);
+    const supabase = createClient();
+
+    // Generate workouts for the specified number of weeks
+    const workoutsToInsert: { client_id: string; template_id: string; workout_date: string; status: string }[] = [];
+    const startDate = new Date(scheduleStartDate + 'T00:00:00');
+
+    for (let week = 0; week < scheduleWeeks; week++) {
+      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+        const dayName = dayNames[dayIndex];
+        const templateId = weeklySchedule[dayName];
+
+        if (templateId) {
+          const workoutDate = new Date(startDate);
+          // Calculate days to add: (week * 7) + days until target day
+          const currentDay = startDate.getDay();
+          let daysToAdd = dayIndex - currentDay;
+          if (daysToAdd < 0) daysToAdd += 7;
+          daysToAdd += week * 7;
+          workoutDate.setDate(startDate.getDate() + daysToAdd);
+
+          workoutsToInsert.push({
+            client_id: clientId,
+            template_id: templateId,
+            workout_date: workoutDate.toISOString().split('T')[0],
+            status: 'scheduled',
+          });
+        }
+      }
+    }
+
+    // Remove duplicates (same client, same template, same date)
+    const uniqueWorkouts = workoutsToInsert.filter((workout, index, self) =>
+      index === self.findIndex(w =>
+        w.client_id === workout.client_id &&
+        w.template_id === workout.template_id &&
+        w.workout_date === workout.workout_date
+      )
+    );
+
+    // Insert workouts
+    const { error } = await supabase
+      .from('assigned_workouts')
+      .insert(uniqueWorkouts);
+
+    if (error) {
+      console.error('Error generating schedule:', error);
+      alert('Failed to generate schedule. Some workouts may already exist for those dates.');
+    } else {
+      setShowScheduleModal(false);
+      fetchClientData();
+      alert(`Schedule generated! ${uniqueWorkouts.length} workouts added for ${scheduleWeeks} weeks.`);
+    }
+
+    setSaving(false);
+  };
+
+  const openSubscriptionModal = (isEdit: boolean = false) => {
+    if (isEdit && subscription) {
+      setSubscriptionForm({
+        plan_type: subscription.plan_type || 'online',
+        plan_name: subscription.plan_name || '',
+        billing_interval: subscription.billing_interval || 'monthly',
+        status: subscription.status || 'active',
+        start_date: subscription.start_date || new Date().toISOString().split('T')[0],
+        next_billing_date: subscription.next_billing_date || '',
+        price: subscription.price?.toString() || '',
+        payment_method: subscription.payment_method || 'external',
+        notes: subscription.notes || '',
+      });
+    } else {
+      setSubscriptionForm({
+        plan_type: 'online',
+        plan_name: '',
+        billing_interval: 'monthly',
+        status: 'active',
+        start_date: new Date().toISOString().split('T')[0],
+        next_billing_date: '',
+        price: '',
+        payment_method: 'external',
+        notes: '',
+      });
+    }
+    setShowSubscriptionModal(true);
+  };
+
+  const saveSubscription = async () => {
+    if (!subscriptionForm.plan_name) {
+      alert('Please enter a plan name');
+      return;
+    }
+
+    setSaving(true);
+    const supabase = createClient();
+
+    // Calculate next billing date if not provided
+    let nextBillingDate = subscriptionForm.next_billing_date;
+    if (!nextBillingDate && subscriptionForm.start_date) {
+      const startDate = new Date(subscriptionForm.start_date);
+      if (subscriptionForm.billing_interval === 'weekly') {
+        startDate.setDate(startDate.getDate() + 7);
+      } else if (subscriptionForm.billing_interval === 'biweekly') {
+        startDate.setDate(startDate.getDate() + 14);
+      } else {
+        startDate.setMonth(startDate.getMonth() + 1);
+      }
+      nextBillingDate = startDate.toISOString().split('T')[0];
+    }
+
+    const subscriptionData = {
+      user_id: clientId,
+      plan_type: subscriptionForm.plan_type,
+      plan_name: subscriptionForm.plan_name,
+      billing_interval: subscriptionForm.billing_interval,
+      status: subscriptionForm.status,
+      start_date: subscriptionForm.start_date,
+      next_billing_date: nextBillingDate || null,
+      price: subscriptionForm.price ? parseFloat(subscriptionForm.price) : null,
+      payment_method: subscriptionForm.payment_method,
+      notes: subscriptionForm.notes || null,
+    };
+
+    let error;
+    if (subscription) {
+      // Update existing
+      const result = await supabase
+        .from('subscriptions')
+        .update(subscriptionData)
+        .eq('id', subscription.id);
+      error = result.error;
+    } else {
+      // Insert new
+      const result = await supabase
+        .from('subscriptions')
+        .insert(subscriptionData);
+      error = result.error;
+    }
+
+    if (error) {
+      console.error('Error saving subscription:', error);
+      alert('Failed to save subscription. Please try again.');
+    } else {
+      // Also update user role to client
+      await supabase
+        .from('profiles')
+        .update({ role: 'client' })
+        .eq('id', clientId);
+
+      setShowSubscriptionModal(false);
+      fetchClientData();
+      alert('Subscription saved successfully!');
+    }
+
+    setSaving(false);
+  };
+
+  const cancelSubscription = async () => {
+    if (!subscription) return;
+    if (!confirm('Are you sure you want to cancel this subscription?')) return;
+
+    setSaving(true);
+    const supabase = createClient();
+
+    const { error } = await supabase
+      .from('subscriptions')
+      .update({ status: 'cancelled' })
+      .eq('id', subscription.id);
+
+    if (error) {
+      console.error('Error cancelling subscription:', error);
+      alert('Failed to cancel subscription.');
+    } else {
+      fetchClientData();
+      alert('Subscription cancelled.');
+    }
+
+    setSaving(false);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -627,6 +1139,95 @@ export default function ClientDetailPage() {
             <Dumbbell className="h-4 w-4 mr-2" />
             Assign Program
           </Button>
+        </div>
+      </div>
+
+      {/* Subscription Status Banner */}
+      <div className={`p-4 flex items-center justify-between ${
+        subscription?.status === 'active'
+          ? 'bg-green-50 border border-green-200'
+          : subscription
+          ? 'bg-yellow-50 border border-yellow-200'
+          : 'bg-grey-50 border border-grey-200'
+      }`}>
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 flex items-center justify-center rounded-lg ${
+            subscription?.status === 'active'
+              ? 'bg-green-100'
+              : subscription
+              ? 'bg-yellow-100'
+              : 'bg-grey-100'
+          }`}>
+            <CreditCard className={`h-5 w-5 ${
+              subscription?.status === 'active'
+                ? 'text-green-600'
+                : subscription
+                ? 'text-yellow-600'
+                : 'text-grey-400'
+            }`} />
+          </div>
+          <div>
+            {subscription ? (
+              <>
+                <p className="font-semibold text-black">{subscription.plan_name}</p>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className={`px-2 py-0.5 text-xs font-medium ${
+                    subscription.status === 'active'
+                      ? 'bg-green-100 text-green-700'
+                      : subscription.status === 'paused'
+                      ? 'bg-yellow-100 text-yellow-700'
+                      : 'bg-red-100 text-red-700'
+                  }`}>
+                    {subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
+                  </span>
+                  <span className="text-grey-500">•</span>
+                  <span className="text-grey-600 capitalize">{subscription.billing_interval}</span>
+                  {subscription.price && (
+                    <>
+                      <span className="text-grey-500">•</span>
+                      <span className="text-grey-600">${subscription.price}</span>
+                    </>
+                  )}
+                  {subscription.payment_method && subscription.payment_method !== 'stripe' && (
+                    <>
+                      <span className="text-grey-500">•</span>
+                      <span className="text-grey-500 capitalize">{subscription.payment_method}</span>
+                    </>
+                  )}
+                </div>
+                {subscription.next_billing_date && (
+                  <p className="text-xs text-grey-500 mt-1">
+                    Next billing: {new Date(subscription.next_billing_date).toLocaleDateString()}
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="font-medium text-grey-600">No Active Subscription</p>
+                <p className="text-sm text-grey-500">Add a subscription for this client</p>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="flex gap-2">
+          {subscription ? (
+            <>
+              <Button onClick={() => openSubscriptionModal(true)} variant="outline" size="sm">
+                <Edit className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
+              {subscription.status === 'active' && (
+                <Button onClick={cancelSubscription} variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50">
+                  Cancel
+                </Button>
+              )}
+            </>
+          ) : (
+            <Button onClick={() => openSubscriptionModal(false)} variant="primary" size="sm">
+              <Plus className="h-4 w-4 mr-1" />
+              Add Subscription
+            </Button>
+          )}
         </div>
       </div>
 
@@ -791,15 +1392,53 @@ export default function ClientDetailPage() {
       {/* Upcoming Workouts */}
       <Card className="mt-6">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="font-semibold text-black flex items-center gap-2">
               <Calendar className="h-5 w-5 text-blue-600" />
               Upcoming Workouts
+              {assignedWorkouts.length > 0 && (
+                <span className="text-sm font-normal text-grey-500">({assignedWorkouts.length})</span>
+              )}
             </h2>
-            <Button onClick={() => setShowCustomWorkoutModal(true)} variant="outline" size="sm">
-              <Plus className="h-4 w-4 mr-1" />
-              Add Workout
-            </Button>
+            <div className="flex gap-2 flex-wrap">
+              {selectMode ? (
+                <>
+                  <Button onClick={selectAllWorkouts} variant="outline" size="sm">
+                    {selectedWorkoutIds.size === assignedWorkouts.length ? 'Deselect All' : 'Select All'}
+                  </Button>
+                  <Button
+                    onClick={deleteSelectedWorkouts}
+                    variant="outline"
+                    size="sm"
+                    disabled={selectedWorkoutIds.size === 0 || saving}
+                    className="text-red-600 border-red-200 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete ({selectedWorkoutIds.size})
+                  </Button>
+                  <Button onClick={cancelSelectMode} variant="outline" size="sm">
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {assignedWorkouts.length > 0 && (
+                    <Button onClick={() => setSelectMode(true)} variant="outline" size="sm">
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Mass Delete
+                    </Button>
+                  )}
+                  <Button onClick={openScheduleModal} variant="outline" size="sm">
+                    <Calendar className="h-4 w-4 mr-1" />
+                    Schedule Program
+                  </Button>
+                  <Button onClick={() => setShowCustomWorkoutModal(true)} variant="outline" size="sm">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Workout
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -808,39 +1447,76 @@ export default function ClientDetailPage() {
               {assignedWorkouts.map((workout) => (
                 <div
                   key={workout.id}
-                  className={`p-4 border ${
-                    workout.status === 'completed'
+                  onClick={selectMode ? () => toggleWorkoutSelection(workout.id) : undefined}
+                  className={`p-4 border transition-colors ${
+                    selectMode ? 'cursor-pointer' : ''
+                  } ${
+                    selectedWorkoutIds.has(workout.id)
+                      ? 'border-red-400 bg-red-50 ring-2 ring-red-200'
+                      : workout.status === 'completed'
                       ? 'border-green-200 bg-green-50'
                       : 'border-grey-200 bg-grey-50'
-                  }`}
+                  } ${selectMode && !selectedWorkoutIds.has(workout.id) ? 'hover:border-red-300' : ''}`}
                 >
                   <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-xs text-grey-500">
-                        {new Date(workout.workout_date + 'T00:00:00').toLocaleDateString('en-US', {
-                          weekday: 'short',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </p>
-                      <p className="font-medium text-black mt-1">
-                        {workout.template?.name || 'Workout'}
-                      </p>
-                      {workout.template?.focus && (
-                        <p className="text-xs text-grey-500">{workout.template.focus}</p>
+                    <div className="flex items-start gap-3 flex-1">
+                      {selectMode && (
+                        <div className="pt-0.5">
+                          <input
+                            type="checkbox"
+                            checked={selectedWorkoutIds.has(workout.id)}
+                            onChange={() => toggleWorkoutSelection(workout.id)}
+                            className="w-4 h-4 rounded border-grey-300 text-red-600 focus:ring-red-500"
+                          />
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <p className="text-xs text-grey-500">
+                          {new Date(workout.workout_date + 'T00:00:00').toLocaleDateString('en-US', {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </p>
+                        <p className="font-medium text-black mt-1">
+                          {workout.template?.name || 'Workout'}
+                        </p>
+                        {workout.template?.focus && (
+                          <p className="text-xs text-grey-500">{workout.template.focus}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <span
+                        className={`text-xs px-2 py-0.5 ${
+                          workout.status === 'completed'
+                            ? 'bg-green-100 text-green-700'
+                            : workout.status === 'scheduled'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-grey-100 text-grey-600'
+                        }`}
+                      >
+                        {workout.status}
+                      </span>
+                      {!selectMode && (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => openEditWorkoutModal(workout)}
+                            className="p-1.5 text-grey-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            title="Change Date"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => deleteWorkout(workout.id)}
+                            className="p-1.5 text-grey-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       )}
                     </div>
-                    <span
-                      className={`text-xs px-2 py-0.5 ${
-                        workout.status === 'completed'
-                          ? 'bg-green-100 text-green-700'
-                          : workout.status === 'scheduled'
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-grey-100 text-grey-600'
-                      }`}
-                    >
-                      {workout.status}
-                    </span>
                   </div>
                 </div>
               ))}
@@ -1037,6 +1713,233 @@ export default function ClientDetailPage() {
               <div className="text-center py-8">
                 <Activity className="h-10 w-10 mx-auto text-grey-300 mb-3" />
                 <p className="text-grey-500 text-sm">No workout logs recorded yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Water, Sleep, Habits, Check-ins */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        {/* Water Intake */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-black flex items-center gap-2">
+                <Droplets className="h-5 w-5 text-blue-600" />
+                Water Intake (Last 30 Days)
+              </h2>
+              <span className="text-xs text-grey-500">{waterLogs.length} days logged</span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {waterLogs.length > 0 ? (
+              <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                {waterLogs.map((log, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 bg-blue-50 rounded">
+                    <span className="text-sm text-grey-700">
+                      {new Date(log.log_date + 'T00:00:00').toLocaleDateString('en-US', {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 h-2 bg-blue-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-600"
+                          style={{ width: `${Math.min((log.total_oz / 64) * 100, 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-semibold text-blue-700 min-w-[50px] text-right">
+                        {log.total_oz} oz
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Droplets className="h-10 w-10 mx-auto text-grey-300 mb-3" />
+                <p className="text-grey-500 text-sm">No water logs recorded yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Sleep Logs */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-black flex items-center gap-2">
+                <Moon className="h-5 w-5 text-indigo-600" />
+                Sleep Logs (Last 30 Days)
+              </h2>
+              <span className="text-xs text-grey-500">{sleepLogs.length} nights logged</span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {sleepLogs.length > 0 ? (
+              <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                {sleepLogs.map((log, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 bg-indigo-50 rounded">
+                    <span className="text-sm text-grey-700">
+                      {new Date(log.log_date + 'T00:00:00').toLocaleDateString('en-US', {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold text-indigo-700">
+                        {log.hours_slept}h
+                      </span>
+                      <div className="flex items-center gap-0.5">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className={`h-3 w-3 ${
+                              star <= log.sleep_quality
+                                ? 'text-yellow-500 fill-yellow-500'
+                                : 'text-grey-300'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Moon className="h-10 w-10 mx-auto text-grey-300 mb-3" />
+                <p className="text-grey-500 text-sm">No sleep logs recorded yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Habits & Check-ins */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        {/* Habit Logs */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-black flex items-center gap-2">
+                <CheckSquare className="h-5 w-5 text-orange-600" />
+                Habits (Last 14 Days)
+              </h2>
+              <span className="text-xs text-grey-500">
+                {habitLogs.filter(h => h.completed).length} / {habitLogs.length} completed
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {habitLogs.length > 0 ? (
+              <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                {(() => {
+                  // Group by date
+                  const byDate: Record<string, HabitLog[]> = {};
+                  habitLogs.forEach(log => {
+                    if (!byDate[log.log_date]) byDate[log.log_date] = [];
+                    byDate[log.log_date].push(log);
+                  });
+                  return Object.entries(byDate)
+                    .sort(([a], [b]) => b.localeCompare(a))
+                    .map(([date, logs]) => (
+                      <div key={date} className="p-3 bg-orange-50 rounded">
+                        <p className="text-xs text-grey-500 mb-2">
+                          {new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {logs.map((log, i) => (
+                            <span
+                              key={i}
+                              className={`text-xs px-2 py-0.5 rounded ${
+                                log.completed
+                                  ? 'bg-green-100 text-green-700'
+                                  : 'bg-grey-100 text-grey-500 line-through'
+                              }`}
+                            >
+                              {log.habit_name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ));
+                })()}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <CheckSquare className="h-10 w-10 mx-auto text-grey-300 mb-3" />
+                <p className="text-grey-500 text-sm">No habit logs recorded yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Check-ins */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-black flex items-center gap-2">
+                <ClipboardCheck className="h-5 w-5 text-teal-600" />
+                Recent Check-ins
+              </h2>
+              <span className="text-xs text-grey-500">{checkIns.length} check-ins</span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {checkIns.length > 0 ? (
+              <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                {checkIns.map((checkIn) => (
+                  <div key={checkIn.id} className="p-3 bg-teal-50 rounded">
+                    <p className="text-xs text-grey-500 mb-2">
+                      {new Date(checkIn.submitted_at).toLocaleDateString('en-US', {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2 text-xs mb-2">
+                      {checkIn.energy_level !== null && (
+                        <div className="text-center">
+                          <p className="text-grey-500">Energy</p>
+                          <p className="font-semibold text-teal-700">{checkIn.energy_level}/10</p>
+                        </div>
+                      )}
+                      {checkIn.stress_level !== null && (
+                        <div className="text-center">
+                          <p className="text-grey-500">Stress</p>
+                          <p className="font-semibold text-teal-700">{checkIn.stress_level}/10</p>
+                        </div>
+                      )}
+                      {checkIn.sleep_quality !== null && (
+                        <div className="text-center">
+                          <p className="text-grey-500">Sleep</p>
+                          <p className="font-semibold text-teal-700">{checkIn.sleep_quality}/10</p>
+                        </div>
+                      )}
+                    </div>
+                    {checkIn.notes && (
+                      <p className="text-xs text-grey-600 italic border-t border-teal-100 pt-2 mt-2">
+                        &quot;{checkIn.notes}&quot;
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <ClipboardCheck className="h-10 w-10 mx-auto text-grey-300 mb-3" />
+                <p className="text-grey-500 text-sm">No check-ins submitted yet</p>
               </div>
             )}
           </CardContent>
@@ -1300,6 +2203,360 @@ export default function ClientDetailPage() {
                 >
                   <Save className="h-4 w-4 mr-2" />
                   {saving ? 'Assigning...' : 'Assign Program'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Subscription Modal */}
+      {showSubscriptionModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-black">
+                  {subscription ? 'Edit Subscription' : 'Add Subscription'}
+                </h3>
+                <button onClick={() => setShowSubscriptionModal(false)} className="text-grey-400 hover:text-black">
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-black mb-2">
+                    Plan Type *
+                  </label>
+                  <select
+                    value={subscriptionForm.plan_type}
+                    onChange={(e) => setSubscriptionForm({ ...subscriptionForm, plan_type: e.target.value })}
+                    className="w-full border border-grey-300 px-4 py-3 text-black bg-white focus:outline-none focus:border-blue-600"
+                  >
+                    <option value="online">Online Coaching</option>
+                    <option value="hybrid">Hybrid Coaching</option>
+                    <option value="inperson">In-Person Training</option>
+                    <option value="nutrition">Nutrition Only</option>
+                    <option value="custom">Custom Plan</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-black mb-2">
+                    Plan Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={subscriptionForm.plan_name}
+                    onChange={(e) => setSubscriptionForm({ ...subscriptionForm, plan_name: e.target.value })}
+                    placeholder="e.g., Premium Coaching, 3x/week Training"
+                    className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">
+                      Billing Interval
+                    </label>
+                    <select
+                      value={subscriptionForm.billing_interval}
+                      onChange={(e) => setSubscriptionForm({ ...subscriptionForm, billing_interval: e.target.value })}
+                      className="w-full border border-grey-300 px-4 py-3 text-black bg-white focus:outline-none focus:border-blue-600"
+                    >
+                      <option value="weekly">Weekly</option>
+                      <option value="biweekly">Bi-weekly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">
+                      Status
+                    </label>
+                    <select
+                      value={subscriptionForm.status}
+                      onChange={(e) => setSubscriptionForm({ ...subscriptionForm, status: e.target.value })}
+                      className="w-full border border-grey-300 px-4 py-3 text-black bg-white focus:outline-none focus:border-blue-600"
+                    >
+                      <option value="active">Active</option>
+                      <option value="paused">Paused</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={subscriptionForm.start_date}
+                      onChange={(e) => setSubscriptionForm({ ...subscriptionForm, start_date: e.target.value })}
+                      className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">
+                      Next Billing Date
+                    </label>
+                    <input
+                      type="date"
+                      value={subscriptionForm.next_billing_date}
+                      onChange={(e) => setSubscriptionForm({ ...subscriptionForm, next_billing_date: e.target.value })}
+                      placeholder="Auto-calculated if empty"
+                      className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">
+                      Price ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={subscriptionForm.price}
+                      onChange={(e) => setSubscriptionForm({ ...subscriptionForm, price: e.target.value })}
+                      placeholder="e.g., 299"
+                      className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">
+                      Payment Method
+                    </label>
+                    <select
+                      value={subscriptionForm.payment_method}
+                      onChange={(e) => setSubscriptionForm({ ...subscriptionForm, payment_method: e.target.value })}
+                      className="w-full border border-grey-300 px-4 py-3 text-black bg-white focus:outline-none focus:border-blue-600"
+                    >
+                      <option value="external">External (Cash/Venmo/etc)</option>
+                      <option value="stripe">Stripe</option>
+                      <option value="invoice">Invoice</option>
+                      <option value="free">Free/Comp</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-black mb-2">
+                    Notes
+                  </label>
+                  <textarea
+                    value={subscriptionForm.notes}
+                    onChange={(e) => setSubscriptionForm({ ...subscriptionForm, notes: e.target.value })}
+                    rows={2}
+                    placeholder="Any additional notes about this subscription..."
+                    className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600 resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <Button onClick={() => setShowSubscriptionModal(false)} variant="outline" className="flex-1">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={saveSubscription}
+                  variant="primary"
+                  className="flex-1"
+                  disabled={saving || !subscriptionForm.plan_name}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {saving ? 'Saving...' : 'Save Subscription'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Workout Date Modal */}
+      {showEditWorkoutModal && editingWorkout && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-sm">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-black">Change Workout Date</h3>
+                <button onClick={() => setShowEditWorkoutModal(false)} className="text-grey-400 hover:text-black">
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-grey-600 mb-2">
+                    Workout: <span className="font-medium text-black">{editingWorkout.template?.name || 'Workout'}</span>
+                  </p>
+                  <p className="text-sm text-grey-600 mb-4">
+                    Current Date: <span className="font-medium text-black">
+                      {new Date(editingWorkout.workout_date + 'T00:00:00').toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </span>
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-black mb-2">
+                    New Date
+                  </label>
+                  <input
+                    type="date"
+                    value={editWorkoutDate}
+                    onChange={(e) => setEditWorkoutDate(e.target.value)}
+                    className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <Button onClick={() => setShowEditWorkoutModal(false)} variant="outline" className="flex-1">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={updateWorkoutDate}
+                  variant="primary"
+                  className="flex-1"
+                  disabled={saving || !editWorkoutDate}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {saving ? 'Saving...' : 'Update Date'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Program Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-bold text-black">Schedule Weekly Program</h3>
+                  <p className="text-sm text-grey-500">Assign workouts to specific days of the week</p>
+                </div>
+                <button onClick={() => setShowScheduleModal(false)} className="text-grey-400 hover:text-black">
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Schedule Settings */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={scheduleStartDate}
+                      onChange={(e) => setScheduleStartDate(e.target.value)}
+                      className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">
+                      Number of Weeks
+                    </label>
+                    <select
+                      value={scheduleWeeks}
+                      onChange={(e) => setScheduleWeeks(parseInt(e.target.value))}
+                      className="w-full border border-grey-300 px-4 py-3 text-black bg-white focus:outline-none focus:border-blue-600"
+                    >
+                      {[1, 2, 3, 4, 6, 8, 12].map(w => (
+                        <option key={w} value={w}>{w} week{w > 1 ? 's' : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Weekly Schedule */}
+                <div>
+                  <label className="block text-sm font-medium text-black mb-3">
+                    Weekly Schedule
+                  </label>
+                  <div className="space-y-3">
+                    {dayNames.map((day, index) => (
+                      <div key={day} className="flex items-center gap-3">
+                        <span className="w-24 text-sm font-medium text-grey-700">
+                          {dayLabels[index]}
+                        </span>
+                        <select
+                          value={weeklySchedule[day] || ''}
+                          onChange={(e) => setWeeklySchedule({
+                            ...weeklySchedule,
+                            [day]: e.target.value || null,
+                          })}
+                          className={`flex-1 border px-4 py-2 text-black bg-white focus:outline-none focus:border-blue-600 ${
+                            weeklySchedule[day] ? 'border-blue-300 bg-blue-50' : 'border-grey-300'
+                          }`}
+                        >
+                          <option value="">— Rest Day —</option>
+                          {availableTemplates.map(template => (
+                            <option key={template.id} value={template.id}>
+                              {template.name} {template.focus ? `(${template.focus})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Preview */}
+                <div className="bg-grey-50 p-4 border border-grey-200">
+                  <p className="text-sm font-medium text-black mb-2">Schedule Preview</p>
+                  <div className="text-sm text-grey-600">
+                    {Object.entries(weeklySchedule).filter(([_, v]) => v !== null).length === 0 ? (
+                      <p className="text-grey-400 italic">No workouts scheduled yet</p>
+                    ) : (
+                      <ul className="space-y-1">
+                        {dayNames.map((day, index) => {
+                          const templateId = weeklySchedule[day];
+                          if (!templateId) return null;
+                          const template = availableTemplates.find(t => t.id === templateId);
+                          return (
+                            <li key={day} className="flex items-center gap-2">
+                              <span className="font-medium text-black">{dayLabels[index]}:</span>
+                              <span>{template?.name || 'Unknown'}</span>
+                              {template?.focus && <span className="text-grey-400">({template.focus})</span>}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                    <p className="mt-3 text-xs text-grey-500">
+                      This will create {Object.values(weeklySchedule).filter(v => v !== null).length * scheduleWeeks} workouts
+                      over {scheduleWeeks} week{scheduleWeeks > 1 ? 's' : ''}.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <Button onClick={() => setShowScheduleModal(false)} variant="outline" className="flex-1">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={generateSchedule}
+                  variant="primary"
+                  className="flex-1"
+                  disabled={saving || Object.values(weeklySchedule).every(v => v === null)}
+                >
+                  <Calendar className="h-4 w-4 mr-2" />
+                  {saving ? 'Generating...' : 'Generate Schedule'}
                 </Button>
               </div>
             </div>

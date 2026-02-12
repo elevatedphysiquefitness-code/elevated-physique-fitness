@@ -16,12 +16,14 @@ import {
   Inbox,
   Mail,
   UserPlus,
+  Calendar,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 
 const navigation = [
   { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+  { name: 'Calendar', href: '/admin/calendar', icon: Calendar },
   { name: 'Applications', href: '/admin/applications', icon: UserPlus },
   { name: 'Inquiries', href: '/admin/inquiries', icon: Inbox },
   { name: 'Contacts', href: '/admin/contacts', icon: Mail },
