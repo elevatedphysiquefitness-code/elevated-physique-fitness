@@ -16,6 +16,7 @@ import {
   FileText,
   UserCheck,
   Search,
+  Trash2,
 } from 'lucide-react';
 
 interface Application {
@@ -94,6 +95,17 @@ export default function ApplicationsPage() {
       setNotes('');
     }
     setUpdating(false);
+  };
+
+  const deleteApplication = async (id: string) => {
+    if (!confirm('Delete this application? This cannot be undone.')) return;
+
+    const supabase = createClient();
+    const { error } = await supabase.from('coaching_applications').delete().eq('id', id);
+
+    if (!error) {
+      setApplications(applications.filter(a => a.id !== id));
+    }
   };
 
   const filteredApps = filter === 'all'
@@ -282,6 +294,13 @@ export default function ApplicationsPage() {
                       <Phone className="h-4 w-4 mr-1" />
                       Call
                     </a>
+                    <button
+                      onClick={() => deleteApplication(app.id)}
+                      className="inline-flex items-center px-3 py-1.5 text-sm font-medium border border-red-300 text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </button>
                   </div>
                 </CardContent>
               </Card>

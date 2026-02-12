@@ -1,19 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  /* Brand Colors - Elevated Physique Fitness - Named Brown Palette */
+  /* Brand Colors - Elevated Physique Fitness */
 
-  /* Named Brown Colors - True Brown Palette (no orange) */
-  --biscotti: #D4C4A8;      /* Light warm beige - like the Italian cookie */
+  /* Primary Brand Colors */
+  --biscotti: #D4C4A8;      /* Light warm beige */
   --biscotti-light: #EBE4D6;
   --biscotti-dark: #C4B494;
-  --tawny: #8B7355;         /* Warm medium brown - like tawny owl feathers */
-  --tawny-light: #A69178;
-  --tawny-dark: #6B5A45;
-  --cinnamon: #6B4423;      /* True cinnamon bark - warm brown */
-  --cinnamon-light: #8B5A33;
-  --cinnamon-dark: #5A3A1D;
-  --chocolate: #3D2314;     /* Deep rich brown - like dark chocolate */
+  --tawny: #AB875F;         /* Warm tan - brand secondary */
+  --tawny-light: #C4A47D;
+  --tawny-dark: #8B6D4A;
+  --cinnamon: #7A4900;      /* Burnt orange/brown - brand primary accent */
+  --cinnamon-light: #9A5F10;
+  --cinnamon-dark: #5A3600;
+  --chocolate: #3D2314;     /* Deep rich brown - brand dark */
   --chocolate-light: #4D3324;
   --chocolate-dark: #2D1810;
 

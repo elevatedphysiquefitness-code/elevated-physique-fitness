@@ -12,6 +12,9 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const isAdmin = pathname.startsWith('/admin');
   const hideMainLayout = isDashboard || isAdmin;
 
+  // No padding on home page - hero extends to nav
+  const isHomePage = pathname === '/';
+
   if (hideMainLayout) {
     return <>{children}</>;
   }
@@ -19,7 +22,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   return (
     <>
       <Header />
-      <main className="pt-28 sm:pt-32">
+      <main className={isHomePage ? '' : 'pt-28 sm:pt-32'}>
         {children}
       </main>
       <Footer />

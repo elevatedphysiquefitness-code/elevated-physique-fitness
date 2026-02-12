@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Archive,
   Reply,
+  Trash2,
 } from 'lucide-react';
 
 interface ContactMessage {
@@ -91,6 +92,17 @@ export default function ContactsPage() {
       setNotes('');
     }
     setUpdating(false);
+  };
+
+  const deleteMessage = async (id: string) => {
+    if (!confirm('Delete this message? This cannot be undone.')) return;
+
+    const supabase = createClient();
+    const { error } = await supabase.from('contact_messages').delete().eq('id', id);
+
+    if (!error) {
+      setMessages(messages.filter(m => m.id !== id));
+    }
   };
 
   const filteredMessages = filter === 'all'
@@ -265,6 +277,13 @@ export default function ContactsPage() {
                         Call
                       </a>
                     )}
+                    <button
+                      onClick={() => deleteMessage(msg.id)}
+                      className="inline-flex items-center px-3 py-1.5 text-sm font-medium border border-red-300 text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </button>
                   </div>
                 </CardContent>
               </Card>

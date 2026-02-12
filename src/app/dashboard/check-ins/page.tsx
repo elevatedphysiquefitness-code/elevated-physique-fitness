@@ -13,6 +13,7 @@ import {
   ChevronRight,
   ClipboardList,
   X,
+  Trash2,
 } from 'lucide-react';
 
 interface CheckIn {
@@ -184,6 +185,23 @@ export default function CheckInsPage() {
     const dayOfWeek = today.getDay();
     if (dayOfWeek === 0) return 0;
     return 7 - dayOfWeek;
+  };
+
+  const deleteCheckIn = async (checkInId: string) => {
+    if (!confirm('Delete this check-in? This cannot be undone.')) return;
+
+    const supabase = createClient();
+    const { error } = await supabase.from('check_ins').delete().eq('id', checkInId);
+
+    if (!error) {
+      setPastCheckIns(pastCheckIns.filter(c => c.id !== checkInId));
+      setSelectedCheckIn(null);
+      // Check if we deleted current week's check-in
+      const deleted = pastCheckIns.find(c => c.id === checkInId);
+      if (deleted && deleted.week_number === currentWeek) {
+        setHasSubmittedThisWeek(false);
+      }
+    }
   };
 
   if (loading) {
@@ -522,12 +540,21 @@ export default function CheckInsPage() {
                 )}
               </div>
 
-              <button
-                onClick={() => setSelectedCheckIn(null)}
-                className="mt-6 w-full py-3 bg-grey-100 text-black font-medium hover:bg-grey-200 transition-colors"
-              >
-                Close
-              </button>
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={() => deleteCheckIn(selectedCheckIn.id)}
+                  className="flex-1 py-3 bg-red-100 text-red-600 font-medium hover:bg-red-200 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </button>
+                <button
+                  onClick={() => setSelectedCheckIn(null)}
+                  className="flex-1 py-3 bg-grey-100 text-black font-medium hover:bg-grey-200 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

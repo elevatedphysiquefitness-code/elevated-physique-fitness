@@ -23,6 +23,9 @@ import {
   Calendar,
   Trash2,
   CheckSquare,
+  Target,
+  Trophy,
+  Flag,
 } from 'lucide-react';
 
 interface Measurement {
@@ -59,6 +62,19 @@ interface Habit {
   description?: string;
 }
 
+interface Goal {
+  id: string;
+  goal_type: string;
+  title: string;
+  target_value: number;
+  target_unit: string;
+  current_value: number | null;
+  start_value: number | null;
+  target_date: string | null;
+  status: 'active' | 'achieved' | 'abandoned';
+  created_at: string;
+}
+
 const defaultHabits = [
   { name: 'Drink 1 gallon of water', description: 'Stay hydrated throughout the day' },
   { name: 'Sleep 7+ hours', description: 'Get quality sleep for recovery' },
@@ -69,7 +85,7 @@ const defaultHabits = [
 ];
 
 export default function ProgressPage() {
-  const [activeTab, setActiveTab] = useState<'progress' | 'habits'>('progress');
+  const [activeTab, setActiveTab] = useState<'progress' | 'habits' | 'goals'>('progress');
   const [loading, setLoading] = useState(true);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [photos, setPhotos] = useState<ProgressPhoto[]>([]);
@@ -89,6 +105,15 @@ export default function ProgressPage() {
   const [newHabitName, setNewHabitName] = useState('');
   const [newHabitDescription, setNewHabitDescription] = useState('');
   const todayStr = new Date().toISOString().split('T')[0];
+
+  // Goals state
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [newGoal, setNewGoal] = useState({
+    goal_type: 'weight_loss',
+    target_value: '',
+    target_date: '',
+  });
 
   // Form state
   const [newMeasurement, setNewMeasurement] = useState({
@@ -256,6 +281,24 @@ export default function ProgressPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const deletePhoto = async (photoId: string) => {
+    if (!confirm('Delete this photo?')) return;
+    const supabase = createClient();
+    const { error } = await supabase.from('progress_photos').delete().eq('id', photoId);
+    if (!error) {
+      setPhotos(photos.filter(p => p.id !== photoId));
+    }
+  };
+
+  const deleteMeasurement = async (measurementId: string) => {
+    if (!confirm('Delete this measurement entry?')) return;
+    const supabase = createClient();
+    const { error } = await supabase.from('measurements').delete().eq('id', measurementId);
+    if (!error) {
+      setMeasurements(measurements.filter(m => m.id !== measurementId));
+    }
+  };
+
   // Habits functions
   const fetchHabits = async () => {
     const supabase = createClient();
@@ -391,6 +434,121 @@ export default function ProgressPage() {
 
     if (data) setHabits(data);
   };
+
+  // Goals functions
+  const fetchGoals = async () => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: userGoals } = await supabase
+      .from('client_goals')
+      .select('*')
+      .eq('client_id', user.id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false });
+
+    if (userGoals) setGoals(userGoals);
+  };
+
+  const saveGoal = async () => {
+    if (!newGoal.target_value) return;
+    setSaving(true);
+
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setSaving(false);
+      return;
+    }
+
+    // Get current value based on goal type
+    let currentValue = null;
+    if (newGoal.goal_type === 'weight_loss' || newGoal.goal_type === 'weight_gain') {
+      currentValue = measurements[measurements.length - 1]?.weight || null;
+    } else if (newGoal.goal_type === 'body_fat') {
+      currentValue = measurements[measurements.length - 1]?.body_fat_percentage || null;
+    }
+
+    const { error } = await supabase.from('client_goals').insert({
+      client_id: user.id,
+      goal_type: newGoal.goal_type === 'weight_loss' || newGoal.goal_type === 'weight_gain' ? 'weight' : newGoal.goal_type,
+      title: goalTypeLabels[newGoal.goal_type],
+      target_value: parseFloat(newGoal.target_value),
+      target_unit: newGoal.goal_type === 'body_fat' ? '%' : 'lbs',
+      current_value: currentValue,
+      start_value: currentValue,
+      target_date: newGoal.target_date || null,
+      status: 'active',
+    });
+
+    if (!error) {
+      setNewGoal({ goal_type: 'weight_loss', target_value: '', target_date: '' });
+      setShowGoalModal(false);
+      fetchGoals();
+    }
+    setSaving(false);
+  };
+
+  const markGoalAchieved = async (goalId: string) => {
+    const supabase = createClient();
+    await supabase.from('client_goals').update({ status: 'achieved', achieved_date: new Date().toISOString().split('T')[0] }).eq('id', goalId);
+    setGoals(goals.filter(g => g.id !== goalId));
+  };
+
+  const deleteGoal = async (goalId: string) => {
+    if (!confirm('Delete this goal?')) return;
+    const supabase = createClient();
+    await supabase.from('client_goals').delete().eq('id', goalId);
+    setGoals(goals.filter(g => g.id !== goalId));
+  };
+
+  const getGoalProgress = (goal: Goal) => {
+    if (!goal.start_value || !goal.target_value) return 0;
+
+    // Get current value from latest measurement
+    const currentWeight = measurements[measurements.length - 1]?.weight || goal.start_value;
+    const currentBf = measurements[measurements.length - 1]?.body_fat_percentage || goal.start_value;
+
+    if (goal.goal_type === 'weight' && goal.target_value < goal.start_value) {
+      // Weight loss goal
+      const totalToLose = goal.start_value - goal.target_value;
+      const lost = goal.start_value - currentWeight;
+      return totalToLose > 0 ? Math.min(100, Math.max(0, Math.round((lost / totalToLose) * 100))) : 0;
+    } else if (goal.goal_type === 'weight' && goal.target_value > goal.start_value) {
+      // Weight gain goal
+      const totalToGain = goal.target_value - goal.start_value;
+      const gained = currentWeight - goal.start_value;
+      return totalToGain > 0 ? Math.min(100, Math.max(0, Math.round((gained / totalToGain) * 100))) : 0;
+    } else if (goal.goal_type === 'body_fat') {
+      // Body fat reduction goal
+      const totalToLose = goal.start_value - goal.target_value;
+      const lost = goal.start_value - currentBf;
+      return totalToLose > 0 ? Math.min(100, Math.max(0, Math.round((lost / totalToLose) * 100))) : 0;
+    }
+    return 0;
+  };
+
+  const goalTypeLabels: Record<string, string> = {
+    weight_loss: 'Weight Loss',
+    weight_gain: 'Weight Gain',
+    body_fat: 'Body Fat %',
+    muscle_mass: 'Muscle Mass',
+    custom: 'Custom Goal',
+  };
+
+  const goalTypeIcons: Record<string, typeof Scale> = {
+    weight_loss: Scale,
+    weight_gain: TrendingUp,
+    body_fat: Percent,
+    muscle_mass: TrendingUp,
+    custom: Target,
+  };
+
+  // Fetch goals on mount
+  useEffect(() => {
+    fetchGoals();
+  }, []);
 
   const completedCount = Object.values(todayLogs).filter(Boolean).length;
   const habitCompletionRate = habits.length > 0 ? Math.round((completedCount / habits.length) * 100) : 0;
@@ -547,6 +705,17 @@ export default function ProgressPage() {
           <CheckSquare className="h-4 w-4 inline mr-2" />
           Habits
         </button>
+        <button
+          onClick={() => setActiveTab('goals')}
+          className={`px-6 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'goals'
+              ? 'bg-white text-black shadow-sm'
+              : 'text-grey-600 hover:text-black'
+          }`}
+        >
+          <Target className="h-4 w-4 inline mr-2" />
+          Goals
+        </button>
       </div>
 
       {/* Habits Tab Content */}
@@ -678,6 +847,173 @@ export default function ProgressPage() {
                 <div className="mt-6 flex gap-3">
                   <Button onClick={() => setShowHabitModal(false)} variant="outline" className="flex-1">Cancel</Button>
                   <Button onClick={addCustomHabit} variant="primary" className="flex-1">Add Habit</Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Goals Tab Content */}
+      {activeTab === 'goals' && (
+        <div className="space-y-6">
+          <div className="flex justify-end">
+            <Button onClick={() => setShowGoalModal(true)} variant="primary">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Goal
+            </Button>
+          </div>
+
+          {/* Active Goals */}
+          <div className="bg-white p-6">
+            <h2 className="text-lg font-bold text-black mb-6">Your Goals</h2>
+            {goals.length === 0 ? (
+              <div className="text-center py-12">
+                <Target className="h-12 w-12 mx-auto text-grey-300 mb-4" />
+                <h3 className="text-lg font-semibold text-black mb-2">No goals yet</h3>
+                <p className="text-grey-500 mb-6">Set a goal to track your progress</p>
+                <Button onClick={() => setShowGoalModal(true)} variant="primary">
+                  Set Your First Goal
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {goals.map((goal) => {
+                  const progress = getGoalProgress(goal);
+                  const GoalIcon = goalTypeIcons[goal.goal_type] || Target;
+                  const currentValue = goal.goal_type === 'body_fat'
+                    ? measurements[measurements.length - 1]?.body_fat_percentage
+                    : measurements[measurements.length - 1]?.weight;
+                  const unit = goal.target_unit || (goal.goal_type === 'body_fat' ? '%' : 'lbs');
+
+                  return (
+                    <div key={goal.id} className="border border-grey-200 p-4 group">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-blue-100 flex items-center justify-center">
+                            <GoalIcon className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-black">{goal.title}</p>
+                            <p className="text-sm text-grey-500">
+                              Target: {goal.target_value} {unit}
+                              {goal.target_date && ` by ${new Date(goal.target_date).toLocaleDateString()}`}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => markGoalAchieved(goal.id)}
+                            className="p-2 text-green-600 hover:bg-green-50"
+                            title="Mark as achieved"
+                          >
+                            <Trophy className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => deleteGoal(goal.id)}
+                            className="p-2 text-red-600 hover:bg-red-50"
+                            title="Delete goal"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div className="mb-2">
+                        <div className="h-3 bg-grey-200 overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-500 ${
+                              progress >= 100 ? 'bg-green-600' : 'bg-blue-600'
+                            }`}
+                            style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between text-sm">
+                        <span className="text-grey-500">
+                          Current: {currentValue !== undefined && currentValue !== null ? `${currentValue}${unit === '%' ? '%' : ' ' + unit}` : 'No data'}
+                        </span>
+                        <span className={`font-medium ${progress >= 100 ? 'text-green-600' : 'text-blue-600'}`}>
+                          {progress >= 100 ? 'Goal reached!' : `${progress}% complete`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Goal Tips */}
+          <div className="bg-blue-50 border border-blue-200 p-6">
+            <div className="flex items-start gap-3">
+              <Flag className="h-6 w-6 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-semibold text-blue-800 mb-1">Tips for Setting Goals</h3>
+                <ul className="text-sm text-blue-700 space-y-1">
+                  <li>Set specific, measurable targets (e.g., &quot;lose 10 lbs&quot; instead of &quot;lose weight&quot;)</li>
+                  <li>Give yourself a realistic timeline to achieve your goals</li>
+                  <li>Log your measurements regularly to track progress accurately</li>
+                  <li>Celebrate small wins along the way!</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Add Goal Modal */}
+          {showGoalModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white w-full max-w-md p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-bold text-black">Set a New Goal</h3>
+                  <button onClick={() => setShowGoalModal(false)} className="text-grey-400 hover:text-black">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">Goal Type *</label>
+                    <select
+                      value={newGoal.goal_type}
+                      onChange={(e) => setNewGoal({ ...newGoal, goal_type: e.target.value })}
+                      className="w-full border border-grey-300 px-4 py-3 text-black bg-white focus:outline-none focus:border-blue-600"
+                    >
+                      <option value="weight_loss">Weight Loss</option>
+                      <option value="weight_gain">Weight Gain</option>
+                      <option value="body_fat">Reduce Body Fat %</option>
+                      <option value="muscle_mass">Gain Muscle Mass</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">
+                      Target Value * ({newGoal.goal_type === 'body_fat' ? '%' : 'lbs'})
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={newGoal.target_value}
+                      onChange={(e) => setNewGoal({ ...newGoal, target_value: e.target.value })}
+                      placeholder={newGoal.goal_type === 'body_fat' ? 'e.g., 15' : 'e.g., 165'}
+                      className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-black mb-2">Target Date (optional)</label>
+                    <input
+                      type="date"
+                      value={newGoal.target_date}
+                      onChange={(e) => setNewGoal({ ...newGoal, target_date: e.target.value })}
+                      className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                </div>
+                <div className="mt-6 flex gap-3">
+                  <Button onClick={() => setShowGoalModal(false)} variant="outline" className="flex-1">Cancel</Button>
+                  <Button onClick={saveGoal} variant="primary" className="flex-1" disabled={!newGoal.target_value || saving}>
+                    {saving ? 'Saving...' : 'Set Goal'}
+                  </Button>
                 </div>
               </div>
             </div>
@@ -932,13 +1268,19 @@ export default function ProgressPage() {
             {photos.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {photos.slice(-3).map((photo) => (
-                  <div key={photo.id}>
-                    <div className="aspect-[3/4] bg-grey-200 overflow-hidden">
+                  <div key={photo.id} className="group relative">
+                    <div className="aspect-[3/4] bg-grey-200 overflow-hidden relative">
                       <img
                         src={photo.photo_url}
                         alt={`Progress photo - ${photo.photo_type}`}
                         className="w-full h-full object-cover"
                       />
+                      <button
+                        onClick={() => deletePhoto(photo.id)}
+                        className="absolute top-2 right-2 p-2 bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
                     <div className="mt-3 text-center">
                       <p className="font-semibold text-black capitalize">{photo.photo_type}</p>

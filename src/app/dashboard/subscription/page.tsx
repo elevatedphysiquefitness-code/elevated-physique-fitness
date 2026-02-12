@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { CreditCard, Calendar, CheckCircle, AlertCircle } from 'lucide-react';
+import { CreditCard, Calendar, CheckCircle, AlertCircle, Receipt, Download } from 'lucide-react';
 import Button from '@/components/ui/Button';
 
 interface Subscription {
@@ -11,14 +11,26 @@ interface Subscription {
   plan_type: string;
   price: number;
   billing_cycle: string;
+  billing_interval: string;
   status: string;
   start_date: string;
   next_billing_date: string;
+  stripe_customer_id?: string;
+}
+
+interface PaymentRecord {
+  id: string;
+  amount: number;
+  status: string;
+  created: string;
+  invoice_url?: string;
 }
 
 export default function SubscriptionPage() {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingPayments, setLoadingPayments] = useState(false);
 
   useEffect(() => {
     fetchSubscription();
@@ -29,19 +41,40 @@ export default function SubscriptionPage() {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (user) {
+      // Check both client_id and user_id for backwards compatibility
       const { data } = await supabase
         .from('subscriptions')
         .select('*')
-        .eq('client_id', user.id)
+        .or(`client_id.eq.${user.id},user_id.eq.${user.id}`)
         .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
         .single();
 
       if (data) {
         setSubscription(data);
+        // Fetch payment history if we have a stripe customer
+        if (data.stripe_customer_id) {
+          fetchPaymentHistory(data.stripe_customer_id);
+        }
       }
     }
 
     setLoading(false);
+  };
+
+  const fetchPaymentHistory = async (customerId: string) => {
+    setLoadingPayments(true);
+    try {
+      const response = await fetch(`/api/stripe/payments?customer_id=${customerId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setPayments(data.payments || []);
+      }
+    } catch (error) {
+      console.error('Error fetching payment history:', error);
+    }
+    setLoadingPayments(false);
   };
 
   const formatDate = (dateString: string) => {
@@ -53,8 +86,17 @@ export default function SubscriptionPage() {
   };
 
   const formatPrice = (price: number, cycle: string) => {
-    const cycleLabel = cycle === 'weekly' ? '/week' : cycle === 'bi-weekly' ? '/2 weeks' : '/month';
+    const interval = cycle || 'monthly';
+    const cycleLabel = interval === 'weekly' ? '/week' : interval === 'biweekly' || interval === 'bi-weekly' ? '/2 weeks' : '/month';
     return `$${price}${cycleLabel}`;
+  };
+
+  const formatPaymentDate = (timestamp: string) => {
+    return new Date(timestamp).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
   };
 
   if (loading) {
@@ -97,7 +139,7 @@ export default function SubscriptionPage() {
                 <div>
                   <p className="text-sm text-grey-500">Price</p>
                   <p className="font-semibold text-black">
-                    {formatPrice(subscription.price, subscription.billing_cycle)}
+                    {formatPrice(subscription.price, subscription.billing_interval || subscription.billing_cycle)}
                   </p>
                 </div>
               </div>
@@ -183,12 +225,65 @@ export default function SubscriptionPage() {
         </div>
       )}
 
-      {/* Payment History Placeholder */}
+      {/* Payment History */}
       <div className="bg-white p-6">
         <h3 className="text-lg font-bold text-black mb-4">Payment History</h3>
-        <div className="text-center py-8 text-grey-500">
-          <p>Payment history will appear here once you have an active subscription.</p>
-        </div>
+        {loadingPayments ? (
+          <div className="text-center py-8 text-grey-500">
+            <p>Loading payment history...</p>
+          </div>
+        ) : payments.length > 0 ? (
+          <div className="space-y-3">
+            {payments.map((payment) => (
+              <div
+                key={payment.id}
+                className="flex items-center justify-between p-4 bg-grey-50 border border-grey-200"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-100 flex items-center justify-center">
+                    <Receipt className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-black">
+                      ${(payment.amount / 100).toFixed(2)}
+                    </p>
+                    <p className="text-sm text-grey-500">
+                      {formatPaymentDate(payment.created)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`text-xs px-2 py-1 ${
+                      payment.status === 'paid' || payment.status === 'succeeded'
+                        ? 'bg-green-100 text-green-700'
+                        : payment.status === 'pending'
+                        ? 'bg-yellow-100 text-yellow-700'
+                        : 'bg-red-100 text-red-700'
+                    }`}
+                  >
+                    {payment.status === 'succeeded' ? 'Paid' : payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
+                  </span>
+                  {payment.invoice_url && (
+                    <a
+                      href={payment.invoice_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      <Download className="h-4 w-4" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-grey-500">
+            <Receipt className="h-10 w-10 mx-auto text-grey-300 mb-3" />
+            <p>No payment history yet.</p>
+          </div>
+        )}
       </div>
     </div>
   );

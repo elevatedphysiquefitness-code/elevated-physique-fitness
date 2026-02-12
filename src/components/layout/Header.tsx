@@ -19,17 +19,17 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-[#EBE4D6] border-b border-[#D4C4A8]">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-[#AB875F] border-b border-[#8B6D4A]">
       <nav className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-28 sm:h-32 items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center">
+        <div className="flex h-20 sm:h-24 items-center justify-between">
+          {/* Logo - overflows header for bigger presence */}
+          <Link href="/" className="flex items-center relative -my-8">
             <Image
               src="/logo.png"
               alt="Elevated Physique Fitness"
-              width={400}
-              height={400}
-              className="h-24 sm:h-28 w-auto"
+              width={600}
+              height={600}
+              className="h-28 sm:h-40 w-auto"
               priority
             />
           </Link>
@@ -53,7 +53,7 @@ export default function Header() {
               href="/login"
               className="text-sm font-medium text-grey-700 hover:text-[#3D2314] transition-colors border border-grey-300 px-4 py-2 hover:border-[#3D2314]"
             >
-              Client Login
+              Client Login/Signup
             </Link>
             <Link
               href="/apply"
@@ -97,7 +97,7 @@ export default function Header() {
                   className="block bg-white text-[#3D2314] border-2 border-[#3D2314] px-6 py-3 text-center font-semibold hover:bg-[#EBE4D6] transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Client Login
+                  Client Login/Signup
                 </Link>
                 <Link
                   href="/apply"

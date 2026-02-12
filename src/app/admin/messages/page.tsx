@@ -145,6 +145,22 @@ export default function AdminMessagesPage() {
       console.error('Error sending message:', error);
     } else if (data) {
       setMessages([...messages, data]);
+
+      // Send notification to client
+      try {
+        await fetch('/api/messages/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            receiverId: selectedClient.id,
+            senderName: 'Your Coach',
+            messagePreview: newMessage.trim(),
+          }),
+        });
+      } catch (notifyError) {
+        console.error('Failed to send notification:', notifyError);
+      }
+
       setNewMessage('');
     }
 

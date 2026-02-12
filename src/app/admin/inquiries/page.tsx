@@ -15,6 +15,7 @@ import {
   DollarSign,
   Filter,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 
 interface Inquiry {
@@ -91,6 +92,17 @@ export default function InquiriesPage() {
       setNotes('');
     }
     setUpdating(false);
+  };
+
+  const deleteInquiry = async (id: string) => {
+    if (!confirm('Delete this inquiry? This cannot be undone.')) return;
+
+    const supabase = createClient();
+    const { error } = await supabase.from('commitment_inquiries').delete().eq('id', id);
+
+    if (!error) {
+      setInquiries(inquiries.filter(i => i.id !== id));
+    }
   };
 
   const filteredInquiries = filter === 'all'
@@ -290,6 +302,13 @@ export default function InquiriesPage() {
                         Edit Status
                       </Button>
                     )}
+                    <button
+                      onClick={() => deleteInquiry(inquiry.id)}
+                      className="inline-flex items-center px-3 py-1.5 text-sm font-medium border border-red-300 text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </button>
                   </div>
                 </CardContent>
               </Card>

@@ -30,6 +30,7 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [userId, setUserId] = useState<string>('');
+  const [userName, setUserName] = useState<string>('');
   const [userRole, setUserRole] = useState<string>('client');
   const [chatPartnerId, setChatPartnerId] = useState<string>('');
   const [chatPartnerName, setChatPartnerName] = useState<string>('');
@@ -71,6 +72,7 @@ export default function MessagesPage() {
 
         const currentUserRole = profile?.role || 'client';
         setUserRole(currentUserRole);
+        setUserName(profile?.full_name || 'User');
 
         if (currentUserRole === 'admin') {
           // Admin: Show list of all clients they can message
@@ -263,6 +265,22 @@ export default function MessagesPage() {
           if (prev.some(m => m.id === data.id)) return prev;
           return [...prev, data];
         });
+
+        // Send notification to receiver
+        try {
+          await fetch('/api/messages/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              receiverId: chatPartnerId,
+              senderName: userName,
+              messagePreview: newMessage.trim(),
+            }),
+          });
+        } catch (notifyError) {
+          console.error('Failed to send notification:', notifyError);
+        }
+
         setNewMessage('');
       }
     } catch (err) {
