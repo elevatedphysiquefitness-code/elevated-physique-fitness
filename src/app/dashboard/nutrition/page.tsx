@@ -33,6 +33,7 @@ import {
   Loader2,
   ScanBarcode,
   Camera,
+  Wand2,
 } from 'lucide-react';
 
 interface ClientData {
@@ -311,6 +312,7 @@ export default function NutritionPage() {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [foodEntryMode, setFoodEntryMode] = useState<'search' | 'manual' | 'scan'>('search');
+  const [lookingUpMacros, setLookingUpMacros] = useState(false);
 
   // Barcode scanner state
   const [isScanning, setIsScanning] = useState(false);
@@ -621,6 +623,43 @@ export default function NutritionPage() {
     setFoodEntryMode('search');
     setScanError(null);
     stopScanner();
+  };
+
+  const lookUpMacros = async () => {
+    if (!newFood.food_name) return;
+    setLookingUpMacros(true);
+
+    try {
+      const quantity = newFood.serving_size || (newFood.servings !== '1' ? `${newFood.servings} servings` : '');
+      const response = await fetch('/api/ai/macro-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          foodName: newFood.food_name,
+          quantity: quantity || null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.nutrition) {
+        setNewFood(prev => ({
+          ...prev,
+          serving_size: data.nutrition.serving_size || prev.serving_size,
+          calories: String(data.nutrition.calories),
+          protein: String(data.nutrition.protein),
+          carbs: String(data.nutrition.carbs),
+          fat: String(data.nutrition.fat),
+        }));
+        toast.success('Macros filled in automatically!');
+      } else {
+        toast.error(data.error || 'Could not look up macros.');
+      }
+    } catch {
+      toast.error('Failed to look up macros. Try entering them manually.');
+    } finally {
+      setLookingUpMacros(false);
+    }
   };
 
   // Barcode scanner functions
@@ -2053,8 +2092,44 @@ export default function NutritionPage() {
                           ))
                         )}
                         {!isSearching && searchResults.length === 0 && searchQuery.length >= 2 && (
-                          <div className="p-4 text-center">
-                            <p className="text-grey-500 mb-2">No foods found.</p>
+                          <div className="p-4 text-center space-y-2">
+                            <p className="text-grey-500">No foods found.</p>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setFoodEntryMode('manual');
+                                setNewFood({ ...newFood, food_name: searchQuery });
+                                setShowSearchResults(false);
+                                // Auto-lookup macros
+                                setLookingUpMacros(true);
+                                try {
+                                  const response = await fetch('/api/ai/macro-lookup', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ foodName: searchQuery, quantity: null }),
+                                  });
+                                  const data = await response.json();
+                                  if (data.success && data.nutrition) {
+                                    setNewFood(prev => ({
+                                      ...prev,
+                                      food_name: searchQuery,
+                                      serving_size: data.nutrition.serving_size || '',
+                                      calories: String(data.nutrition.calories),
+                                      protein: String(data.nutrition.protein),
+                                      carbs: String(data.nutrition.carbs),
+                                      fat: String(data.nutrition.fat),
+                                    }));
+                                    toast.success('Macros filled in automatically!');
+                                  }
+                                } catch { /* silent */ } finally {
+                                  setLookingUpMacros(false);
+                                }
+                              }}
+                              className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 transition-colors"
+                            >
+                              <Wand2 className="h-4 w-4" />
+                              Auto-fill macros for &quot;{searchQuery}&quot;
+                            </button>
                             <button
                               type="button"
                               onClick={() => {
@@ -2062,9 +2137,9 @@ export default function NutritionPage() {
                                 setNewFood({ ...newFood, food_name: searchQuery });
                                 setShowSearchResults(false);
                               }}
-                              className="text-blue-600 font-medium hover:text-blue-700"
+                              className="text-grey-500 text-sm hover:text-grey-700"
                             >
-                              Add &quot;{searchQuery}&quot; as custom food →
+                              or enter macros manually →
                             </button>
                           </div>
                         )}
@@ -2097,6 +2172,26 @@ export default function NutritionPage() {
                       placeholder="e.g., Homemade Protein Shake, Grilled Salmon..."
                       className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
                     />
+                    {newFood.food_name && !newFood.calories && (
+                      <button
+                        type="button"
+                        onClick={lookUpMacros}
+                        disabled={lookingUpMacros}
+                        className="mt-2 flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors disabled:opacity-50 w-full justify-center"
+                      >
+                        {lookingUpMacros ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Looking up macros...
+                          </>
+                        ) : (
+                          <>
+                            <Wand2 className="h-4 w-4" />
+                            Auto-fill macros for &quot;{newFood.food_name}&quot;
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -2133,9 +2228,26 @@ export default function NutritionPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-black mb-2">
-                        Calories *
-                      </label>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-black">
+                          Calories *
+                        </label>
+                        {foodEntryMode === 'manual' && newFood.food_name && (
+                          <button
+                            type="button"
+                            onClick={lookUpMacros}
+                            disabled={lookingUpMacros}
+                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
+                          >
+                            {lookingUpMacros ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Wand2 className="h-3 w-3" />
+                            )}
+                            {lookingUpMacros ? 'Looking up...' : 'Auto-fill macros'}
+                          </button>
+                        )}
+                      </div>
                       <input
                         type="number"
                         value={newFood.calories}

@@ -202,6 +202,13 @@ export default function ClientDetailPage() {
   const [selectedProgramId, setSelectedProgramId] = useState('');
   const [assignmentNotes, setAssignmentNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [programTemplates, setProgramTemplates] = useState<WorkoutTemplate[]>([]);
+  const [programDaySchedule, setProgramDaySchedule] = useState<WeeklySchedule>({
+    sunday: null, monday: null, tuesday: null, wednesday: null,
+    thursday: null, friday: null, saturday: null,
+  });
+  const [programStartDate, setProgramStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [programWeeks, setProgramWeeks] = useState(4);
 
   // Custom workout builder state
   const [showCustomWorkoutModal, setShowCustomWorkoutModal] = useState(false);
@@ -541,8 +548,41 @@ export default function ClientDetailPage() {
     setLoading(false);
   };
 
+  const onProgramSelect = async (programId: string) => {
+    setSelectedProgramId(programId);
+    setProgramDaySchedule({
+      sunday: null, monday: null, tuesday: null, wednesday: null,
+      thursday: null, friday: null, saturday: null,
+    });
+    setProgramTemplates([]);
+
+    if (!programId) return;
+
+    const supabase = createClient();
+    const { data: templates } = await supabase
+      .from('workout_templates')
+      .select('id, name, title, focus')
+      .eq('program_id', programId)
+      .order('day_number');
+
+    if (templates && templates.length > 0) {
+      setProgramTemplates(templates.map(t => ({
+        ...t,
+        name: t.name || t.title || 'Unnamed Workout',
+      })));
+    }
+  };
+
   const assignProgram = async () => {
     if (!selectedProgramId) return;
+
+    // Ensure at least one day is assigned
+    const hasSchedule = Object.values(programDaySchedule).some(v => v !== null);
+    if (programTemplates.length > 0 && !hasSchedule) {
+      alert('Please assign at least one workout to a day of the week.');
+      return;
+    }
+
     setSaving(true);
 
     const supabase = createClient();
@@ -564,7 +604,7 @@ export default function ClientDetailPage() {
         client_id: clientId,
         program_id: selectedProgramId,
         program_name: selectedProgram?.title || 'Program',
-        start_date: new Date().toISOString().split('T')[0],
+        start_date: programStartDate,
         current_week: 1,
         total_weeks: selectedProgram?.duration_weeks || 12,
         status: 'active',
@@ -577,41 +617,111 @@ export default function ClientDetailPage() {
       alert('Failed to assign program. Please try again.');
       console.error('Error assigning program:', error);
     } else {
-      // Create assigned_workouts for the first week so they show on calendar
-      const { data: templates } = await supabase
-        .from('workout_templates')
-        .select('id')
-        .or(`created_by.eq.${user?.id},created_for_client_id.eq.${clientId}`)
-        .limit(selectedProgram?.duration_weeks ? Math.min(7, selectedProgram.duration_weeks) : 5);
+      // Create assigned_workouts using the day schedule
+      if (hasSchedule) {
+        const workoutsToInsert: { client_id: string; template_id: string; workout_date: string; status: string }[] = [];
+        const startDate = new Date(programStartDate + 'T00:00:00');
+        const weeksToSchedule = programWeeks;
 
-      if (templates && templates.length > 0) {
-        const startDate = new Date();
-        const dayOfWeek = startDate.getDay();
-        const mondayOffset = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
-        const nextMonday = new Date(startDate);
-        nextMonday.setDate(startDate.getDate() + mondayOffset);
+        for (let week = 0; week < weeksToSchedule; week++) {
+          for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+            const dayName = dayNames[dayIndex];
+            const templateId = programDaySchedule[dayName];
 
-        const assignedWorkouts = templates.map((template, i) => {
-          const workoutDate = new Date(nextMonday);
-          workoutDate.setDate(nextMonday.getDate() + i);
-          return {
-            client_id: clientId,
-            template_id: template.id,
-            workout_date: workoutDate.toISOString().split('T')[0],
-            status: 'scheduled',
-          };
-        });
+            if (templateId) {
+              const workoutDate = new Date(startDate);
+              const currentDay = startDate.getDay();
+              let daysToAdd = dayIndex - currentDay;
+              if (daysToAdd < 0) daysToAdd += 7;
+              daysToAdd += week * 7;
+              workoutDate.setDate(startDate.getDate() + daysToAdd);
 
-        await supabase.from('assigned_workouts').insert(assignedWorkouts);
+              workoutsToInsert.push({
+                client_id: clientId,
+                template_id: templateId,
+                workout_date: workoutDate.toISOString().split('T')[0],
+                status: 'scheduled',
+              });
+            }
+          }
+        }
+
+        // Remove duplicates
+        const uniqueWorkouts = workoutsToInsert.filter((workout, index, self) =>
+          index === self.findIndex(w =>
+            w.client_id === workout.client_id &&
+            w.template_id === workout.template_id &&
+            w.workout_date === workout.workout_date
+          )
+        );
+
+        if (uniqueWorkouts.length > 0) {
+          await supabase.from('assigned_workouts').insert(uniqueWorkouts);
+        }
       }
 
       setShowAssignModal(false);
       setSelectedProgramId('');
       setAssignmentNotes('');
+      setProgramTemplates([]);
+      setProgramDaySchedule({
+        sunday: null, monday: null, tuesday: null, wednesday: null,
+        thursday: null, friday: null, saturday: null,
+      });
       fetchClientData();
     }
 
     setSaving(false);
+  };
+
+  const deleteClientProgram = async (programId: string, programName: string) => {
+    if (!confirm(`Are you sure you want to remove "${programName}" from this client? This will also delete all future scheduled workouts for this program.`)) {
+      return;
+    }
+
+    const supabase = createClient();
+
+    // Get the program's template IDs so we can delete future assigned workouts
+    const { data: programRecord } = await supabase
+      .from('client_programs')
+      .select('program_id')
+      .eq('id', programId)
+      .single();
+
+    if (programRecord?.program_id) {
+      // Get template IDs for this program
+      const { data: templates } = await supabase
+        .from('workout_templates')
+        .select('id')
+        .eq('program_id', programRecord.program_id);
+
+      if (templates && templates.length > 0) {
+        const templateIds = templates.map(t => t.id);
+        const today = new Date().toISOString().split('T')[0];
+
+        // Delete future scheduled workouts for these templates
+        await supabase
+          .from('assigned_workouts')
+          .delete()
+          .eq('client_id', clientId)
+          .in('template_id', templateIds)
+          .gte('workout_date', today)
+          .eq('status', 'scheduled');
+      }
+    }
+
+    // Delete the client_programs record
+    const { error } = await supabase
+      .from('client_programs')
+      .delete()
+      .eq('id', programId);
+
+    if (error) {
+      console.error('Error deleting program:', error);
+      alert('Failed to delete program. Please try again.');
+    } else {
+      fetchClientData();
+    }
   };
 
   const addExerciseToWorkout = () => {
@@ -1324,9 +1434,18 @@ export default function ClientDetailPage() {
                 <div className="text-sm text-grey-600">
                   Started: {new Date(activeProgram.start_date).toLocaleDateString()}
                 </div>
-                <Button onClick={() => setShowAssignModal(true)} variant="outline" className="w-full">
-                  Change Program
-                </Button>
+                <div className="flex gap-2">
+                  <Button onClick={() => setShowAssignModal(true)} variant="outline" className="flex-1">
+                    Change Program
+                  </Button>
+                  <Button
+                    onClick={() => deleteClientProgram(activeProgram.id, activeProgram.program_name)}
+                    variant="outline"
+                    className="text-red-600 border-red-300 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="text-center py-6">
@@ -1342,9 +1461,18 @@ export default function ClientDetailPage() {
               <div className="mt-6 pt-4 border-t border-grey-200">
                 <p className="text-xs text-grey-500 mb-2">Previous Programs</p>
                 {programs.filter(p => p.status !== 'active').slice(0, 3).map(p => (
-                  <div key={p.id} className="flex justify-between text-sm py-1">
-                    <span className="text-grey-600">{p.program_name}</span>
-                    <span className="text-grey-400 capitalize">{p.status}</span>
+                  <div key={p.id} className="flex items-center justify-between text-sm py-2">
+                    <div>
+                      <span className="text-grey-600">{p.program_name}</span>
+                      <span className="text-grey-400 capitalize ml-2">({p.status})</span>
+                    </div>
+                    <button
+                      onClick={() => deleteClientProgram(p.id, p.program_name)}
+                      className="text-red-400 hover:text-red-600 p-1"
+                      title="Remove program"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -2133,10 +2261,13 @@ export default function ClientDetailPage() {
       {/* Assign Program Modal */}
       {showAssignModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-md">
+          <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-black">Assign Program</h3>
+                <div>
+                  <h3 className="text-lg font-bold text-black">Assign Program</h3>
+                  <p className="text-sm text-grey-500">Select a program and assign workouts to days</p>
+                </div>
                 <button onClick={() => setShowAssignModal(false)} className="text-grey-400 hover:text-black">
                   <X className="h-6 w-6" />
                 </button>
@@ -2149,7 +2280,7 @@ export default function ClientDetailPage() {
                   </label>
                   <select
                     value={selectedProgramId}
-                    onChange={(e) => setSelectedProgramId(e.target.value)}
+                    onChange={(e) => onProgramSelect(e.target.value)}
                     className="w-full border border-grey-300 px-4 py-3 text-black bg-white focus:outline-none focus:border-blue-600"
                   >
                     <option value="">Choose a program...</option>
@@ -2165,6 +2296,108 @@ export default function ClientDetailPage() {
                   <div className="bg-blue-50 p-3 border border-blue-200">
                     <p className="text-sm text-blue-800">
                       {allPrograms.find(p => p.id === selectedProgramId)?.description || 'No description'}
+                    </p>
+                  </div>
+                )}
+
+                {/* Day Schedule - shown after selecting a program with templates */}
+                {selectedProgramId && programTemplates.length > 0 && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-black mb-2">
+                          Start Date
+                        </label>
+                        <input
+                          type="date"
+                          value={programStartDate}
+                          onChange={(e) => setProgramStartDate(e.target.value)}
+                          className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-black mb-2">
+                          Number of Weeks
+                        </label>
+                        <select
+                          value={programWeeks}
+                          onChange={(e) => setProgramWeeks(parseInt(e.target.value))}
+                          className="w-full border border-grey-300 px-4 py-3 text-black bg-white focus:outline-none focus:border-blue-600"
+                        >
+                          {[1, 2, 3, 4, 6, 8, 12].map(w => (
+                            <option key={w} value={w}>{w} week{w > 1 ? 's' : ''}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-black mb-3">
+                        Assign Workouts to Days
+                      </label>
+                      <div className="space-y-3">
+                        {dayNames.map((day, index) => (
+                          <div key={day} className="flex items-center gap-3">
+                            <span className="w-24 text-sm font-medium text-grey-700">
+                              {dayLabels[index]}
+                            </span>
+                            <select
+                              value={programDaySchedule[day] || ''}
+                              onChange={(e) => setProgramDaySchedule({
+                                ...programDaySchedule,
+                                [day]: e.target.value || null,
+                              })}
+                              className={`flex-1 border px-4 py-2 text-black bg-white focus:outline-none focus:border-blue-600 ${
+                                programDaySchedule[day] ? 'border-blue-300 bg-blue-50' : 'border-grey-300'
+                              }`}
+                            >
+                              <option value="">-- Rest Day --</option>
+                              {programTemplates.map(template => (
+                                <option key={template.id} value={template.id}>
+                                  {template.name} {template.focus ? `(${template.focus})` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Schedule Preview */}
+                    <div className="bg-grey-50 p-4 border border-grey-200">
+                      <p className="text-sm font-medium text-black mb-2">Schedule Preview</p>
+                      <div className="text-sm text-grey-600">
+                        {Object.values(programDaySchedule).every(v => v === null) ? (
+                          <p className="text-grey-400 italic">No workouts assigned yet</p>
+                        ) : (
+                          <ul className="space-y-1">
+                            {dayNames.map((day, index) => {
+                              const templateId = programDaySchedule[day];
+                              if (!templateId) return null;
+                              const template = programTemplates.find(t => t.id === templateId);
+                              return (
+                                <li key={day} className="flex items-center gap-2">
+                                  <span className="font-medium text-black">{dayLabels[index]}:</span>
+                                  <span>{template?.name || 'Unknown'}</span>
+                                  {template?.focus && <span className="text-grey-400">({template.focus})</span>}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                        <p className="mt-3 text-xs text-grey-500">
+                          This will create {Object.values(programDaySchedule).filter(v => v !== null).length * programWeeks} workouts
+                          over {programWeeks} week{programWeeks > 1 ? 's' : ''}.
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {selectedProgramId && programTemplates.length === 0 && (
+                  <div className="bg-yellow-50 border border-yellow-200 p-3">
+                    <p className="text-sm text-yellow-800">
+                      This program has no workout templates yet. Add workout days in the program editor first.
                     </p>
                   </div>
                 )}
@@ -2199,7 +2432,7 @@ export default function ClientDetailPage() {
                   onClick={assignProgram}
                   variant="primary"
                   className="flex-1"
-                  disabled={saving || !selectedProgramId}
+                  disabled={saving || !selectedProgramId || (programTemplates.length > 0 && Object.values(programDaySchedule).every(v => v === null))}
                 >
                   <Save className="h-4 w-4 mr-2" />
                   {saving ? 'Assigning...' : 'Assign Program'}

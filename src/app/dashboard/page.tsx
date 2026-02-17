@@ -44,6 +44,13 @@ interface Habit {
   completed: boolean;
 }
 
+interface UpcomingWorkout {
+  id: string;
+  workout_date: string;
+  status: string;
+  template: { name: string }[] | null;
+}
+
 const defaultStats: DashboardStats = {
   total_sessions_completed: 0,
   total_check_ins: 0,
@@ -70,6 +77,8 @@ export default function DashboardPage() {
   const [sleepQuality, setSleepQuality] = useState<number | null>(null);
   const [showSleepModal, setShowSleepModal] = useState(false);
   const [sleepInput, setSleepInput] = useState({ hours: '', quality: 3 });
+  const [todayWorkout, setTodayWorkout] = useState<UpcomingWorkout | null>(null);
+  const [nextWorkout, setNextWorkout] = useState<UpcomingWorkout | null>(null);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -172,6 +181,49 @@ export default function DashboardPage() {
           };
         });
         setHabits(habitsWithStatus);
+      }
+
+      // Fetch today's workout
+      const { data: todayWorkoutData } = await supabase
+        .from('assigned_workouts')
+        .select(`
+          id,
+          workout_date,
+          status,
+          template:workout_templates(name)
+        `)
+        .eq('client_id', user.id)
+        .eq('workout_date', today)
+        .neq('status', 'rest')
+        .limit(1)
+        .single();
+
+      if (todayWorkoutData) {
+        setTodayWorkout(todayWorkoutData as UpcomingWorkout);
+      }
+
+      // Fetch next upcoming workout (after today)
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+      const { data: nextWorkoutData } = await supabase
+        .from('assigned_workouts')
+        .select(`
+          id,
+          workout_date,
+          status,
+          template:workout_templates(name)
+        `)
+        .eq('client_id', user.id)
+        .gte('workout_date', tomorrowStr)
+        .eq('status', 'scheduled')
+        .order('workout_date', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (nextWorkoutData) {
+        setNextWorkout(nextWorkoutData as UpcomingWorkout);
       }
 
       setLoading(false);
@@ -286,10 +338,30 @@ export default function DashboardPage() {
 
   const waterPercentage = Math.min(Math.round((waterIntake / waterGoal) * 100), 100);
 
+  const getWorkoutName = (workout: UpcomingWorkout | null) => {
+    if (!workout) return null;
+    return workout.template?.[0]?.name || 'Workout';
+  };
+
+  const formatNextDate = (dateStr: string) => {
+    const date = new Date(dateStr + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    if (date.getTime() === tomorrow.getTime()) {
+      return 'Tomorrow';
+    }
+    return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  };
+
+  const todayWorkoutName = getWorkoutName(todayWorkout);
+
   const quickActions = [
     {
-      title: "Today's Workout",
-      description: 'View your scheduled workout',
+      title: todayWorkoutName ? `Today: ${todayWorkoutName}` : "Today's Workout",
+      description: todayWorkoutName ? 'View your scheduled workout' : 'No workout scheduled today',
       icon: Dumbbell,
       href: '/dashboard/workouts',
       color: 'bg-blue-600',
@@ -734,10 +806,18 @@ export default function DashboardPage() {
                 <Clock className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="font-semibold text-black">Next Session</p>
-                <p className="text-sm text-grey-600 mt-1">Check your schedule for upcoming sessions</p>
-                <Button href="/dashboard/calendar" variant="outline" size="sm" className="mt-3">
-                  View Schedule
+                <p className="font-semibold text-black">
+                  {nextWorkout
+                    ? `Next: ${getWorkoutName(nextWorkout)}`
+                    : 'Next Session'}
+                </p>
+                <p className="text-sm text-grey-600 mt-1">
+                  {nextWorkout
+                    ? formatNextDate(nextWorkout.workout_date)
+                    : 'No upcoming sessions scheduled'}
+                </p>
+                <Button href="/dashboard/workouts" variant="outline" size="sm" className="mt-3">
+                  {nextWorkout ? 'View Workout' : 'View Schedule'}
                 </Button>
               </div>
             </div>
