@@ -20,6 +20,7 @@ import {
   Gift,
   BarChart3,
   Bell,
+  Award,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -31,6 +32,7 @@ const navigation = [
   { name: 'Nutrition', href: '/dashboard/nutrition', icon: Apple },
   { name: 'Food History', href: '/dashboard/food-history', icon: UtensilsCrossed },
   { name: 'Check-ins', href: '/dashboard/check-ins', icon: Calendar },
+  { name: 'Grades', href: '/dashboard/grades', icon: Award },
   { name: 'Messages', href: '/dashboard/messages', icon: MessageSquare },
   { name: 'Videos', href: '/dashboard/videos', icon: PlayCircle },
   { name: 'Referrals', href: '/dashboard/referrals', icon: Gift },

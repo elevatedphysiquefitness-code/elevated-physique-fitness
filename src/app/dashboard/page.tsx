@@ -21,6 +21,7 @@ import {
   Minus,
   Moon,
   Star,
+  Award,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 
@@ -51,6 +52,19 @@ interface UpcomingWorkout {
   template: { name: string }[] | null;
 }
 
+interface LatestGrade {
+  overall_grade: number;
+  workout_consistency: number;
+  workout_intensity: number;
+  nutrition_adherence: number;
+  water_intake: number;
+  sleep: number;
+  strengths: string | null;
+  improvements: string | null;
+  graded_week_start: string;
+  week_number: number;
+}
+
 const defaultStats: DashboardStats = {
   total_sessions_completed: 0,
   total_check_ins: 0,
@@ -79,6 +93,7 @@ export default function DashboardPage() {
   const [sleepInput, setSleepInput] = useState({ hours: '', quality: 3 });
   const [todayWorkout, setTodayWorkout] = useState<UpcomingWorkout | null>(null);
   const [nextWorkout, setNextWorkout] = useState<UpcomingWorkout | null>(null);
+  const [latestGrade, setLatestGrade] = useState<LatestGrade | null>(null);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -224,6 +239,19 @@ export default function DashboardPage() {
 
       if (nextWorkoutData) {
         setNextWorkout(nextWorkoutData as UpcomingWorkout);
+      }
+
+      // Fetch latest weekly grade
+      const { data: gradeData } = await supabase
+        .from('weekly_grades')
+        .select('overall_grade, workout_consistency, workout_intensity, nutrition_adherence, water_intake, sleep, strengths, improvements, graded_week_start, week_number')
+        .eq('client_id', user.id)
+        .order('graded_week_start', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (gradeData) {
+        setLatestGrade(gradeData);
       }
 
       setLoading(false);
@@ -741,6 +769,77 @@ export default function DashboardPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Weekly Grade Card */}
+      {latestGrade && (
+        <div className="bg-white p-6 rounded-lg shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                <Award className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <h2 className="font-bold text-black">Weekly Grade</h2>
+                <p className="text-sm text-grey-500">Week {latestGrade.week_number}</p>
+              </div>
+            </div>
+            <Link href="/dashboard/grades" className="text-sm text-blue-600 hover:underline">
+              View History
+            </Link>
+          </div>
+
+          <div className="flex items-start gap-6">
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold flex-shrink-0 ${
+              latestGrade.overall_grade >= 8 ? 'bg-green-500' :
+              latestGrade.overall_grade >= 6 ? 'bg-yellow-500' :
+              latestGrade.overall_grade >= 4 ? 'bg-orange-500' : 'bg-red-500'
+            }`}>
+              {latestGrade.overall_grade}
+            </div>
+            <div className="flex-1 space-y-2">
+              {[
+                { label: 'Consistency', value: latestGrade.workout_consistency },
+                { label: 'Intensity', value: latestGrade.workout_intensity },
+                { label: 'Nutrition', value: latestGrade.nutrition_adherence },
+                { label: 'Water', value: latestGrade.water_intake },
+                { label: 'Sleep', value: latestGrade.sleep },
+              ].map((cat) => (
+                <div key={cat.label} className="flex items-center gap-2">
+                  <span className="text-xs text-grey-500 w-20">{cat.label}</span>
+                  <div className="flex-1 h-2 bg-grey-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${
+                        cat.value >= 8 ? 'bg-green-500' :
+                        cat.value >= 6 ? 'bg-yellow-500' :
+                        cat.value >= 4 ? 'bg-orange-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${cat.value * 10}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-medium text-grey-700 w-5 text-right">{cat.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {(latestGrade.strengths || latestGrade.improvements) && (
+            <div className="mt-4 space-y-2">
+              {latestGrade.strengths && (
+                <div className="p-3 bg-green-50 border-l-4 border-green-500 rounded-r-lg">
+                  <p className="text-xs font-medium text-green-700 mb-0.5">Strengths</p>
+                  <p className="text-sm text-grey-700">{latestGrade.strengths}</p>
+                </div>
+              )}
+              {latestGrade.improvements && (
+                <div className="p-3 bg-orange-50 border-l-4 border-orange-500 rounded-r-lg">
+                  <p className="text-xs font-medium text-orange-700 mb-0.5">Areas to Improve</p>
+                  <p className="text-sm text-grey-700">{latestGrade.improvements}</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

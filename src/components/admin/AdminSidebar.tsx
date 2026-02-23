@@ -18,6 +18,7 @@ import {
   UserPlus,
   Calendar,
   ListChecks,
+  Award,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -33,6 +34,7 @@ const navigation = [
   { name: 'Programs', href: '/admin/programs', icon: Dumbbell },
   { name: 'Exercises', href: '/admin/exercises', icon: Video },
   { name: 'Check-ins', href: '/admin/check-ins', icon: ClipboardCheck },
+  { name: 'Grades', href: '/admin/grades', icon: Award },
   { name: 'Messages', href: '/admin/messages', icon: MessageSquare },
   { name: 'Blog', href: '/admin/blog', icon: FileText },
 ];
