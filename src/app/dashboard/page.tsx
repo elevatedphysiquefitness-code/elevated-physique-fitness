@@ -22,6 +22,7 @@ import {
   Moon,
   Star,
   Award,
+  ChefHat,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 
@@ -407,6 +408,13 @@ export default function DashboardPage() {
       icon: CheckSquare,
       href: '/dashboard/habits',
       color: 'bg-purple-600',
+    },
+    {
+      title: 'Meal Plan',
+      description: 'Generate meals to hit your macros',
+      icon: ChefHat,
+      href: '/dashboard/meals',
+      color: 'bg-teal-600',
     },
     {
       title: 'Messages',
