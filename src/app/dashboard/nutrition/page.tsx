@@ -273,6 +273,7 @@ export default function NutritionPage() {
   const [macros, setMacros] = useState<Macros | null>(null);
   const [mealSuggestions, setMealSuggestions] = useState<MealSuggestion[]>([]);
   const [loadingMeals, setLoadingMeals] = useState(false);
+  const [burnedCalories, setBurnedCalories] = useState(0);
   const [expandedMeal, setExpandedMeal] = useState<number | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showMealOptionsModal, setShowMealOptionsModal] = useState(false);
@@ -378,12 +379,26 @@ export default function NutritionPage() {
     fetchClientData();
   }, []);
 
-  // Refetch food logs when date changes
+  // Refetch food logs and burned calories when date changes
   useEffect(() => {
     if (userId) {
       fetchFoodLogs(userId, selectedDate);
+      fetchBurnedCalories(userId, selectedDate);
     }
   }, [selectedDate, userId]);
+
+  const fetchBurnedCalories = async (clientId: string, date: string) => {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('activity_logs')
+      .select('calories_burned')
+      .eq('client_id', clientId)
+      .eq('log_date', date);
+
+    if (data) {
+      setBurnedCalories(data.reduce((sum, log) => sum + (log.calories_burned || 0), 0));
+    }
+  };
 
   const fetchClientData = async () => {
     const supabase = createClient();
@@ -1197,6 +1212,35 @@ export default function NutritionPage() {
                   <span className="text-red-600 font-semibold">{Math.round(remainingMacros.protein)}g protein</span>
                   <span className="text-yellow-600 font-semibold">{Math.round(remainingMacros.carbs)}g carbs</span>
                   <span className="text-green-600 font-semibold">{Math.round(remainingMacros.fat)}g fat</span>
+                </div>
+              </div>
+            )}
+
+            {/* Energy Balance */}
+            {burnedCalories > 0 && (
+              <div className="bg-grey-50 p-4 mb-4 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Flame className="h-4 w-4 text-red-500" />
+                    <span className="text-sm font-medium text-grey-700">Energy Balance</span>
+                  </div>
+                  <a href="/dashboard/activity" className="text-xs text-blue-600 hover:underline">
+                    Log Activity
+                  </a>
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="bg-white p-2 rounded">
+                    <p className="text-sm font-bold text-orange-600">{consumedMacros.calories}</p>
+                    <p className="text-xs text-grey-500">Consumed</p>
+                  </div>
+                  <div className="bg-white p-2 rounded">
+                    <p className="text-sm font-bold text-red-600">{burnedCalories}</p>
+                    <p className="text-xs text-grey-500">Burned</p>
+                  </div>
+                  <div className="bg-white p-2 rounded">
+                    <p className="text-sm font-bold text-blue-600">{consumedMacros.calories - burnedCalories}</p>
+                    <p className="text-xs text-grey-500">Net</p>
+                  </div>
                 </div>
               </div>
             )}

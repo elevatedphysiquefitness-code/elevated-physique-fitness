@@ -22,6 +22,7 @@ import {
   Bell,
   Award,
   ChefHat,
+  Activity,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -33,6 +34,7 @@ const navigation = [
   { name: 'Nutrition', href: '/dashboard/nutrition', icon: Apple },
   { name: 'Food History', href: '/dashboard/food-history', icon: UtensilsCrossed },
   { name: 'Meal Plan', href: '/dashboard/meals', icon: ChefHat },
+  { name: 'Activity', href: '/dashboard/activity', icon: Activity },
   { name: 'Check-ins', href: '/dashboard/check-ins', icon: Calendar },
   { name: 'Grades', href: '/dashboard/grades', icon: Award },
   { name: 'Messages', href: '/dashboard/messages', icon: MessageSquare },

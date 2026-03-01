@@ -23,6 +23,7 @@ import {
   Star,
   Award,
   ChefHat,
+  Activity,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 
@@ -415,6 +416,13 @@ export default function DashboardPage() {
       icon: ChefHat,
       href: '/dashboard/meals',
       color: 'bg-teal-600',
+    },
+    {
+      title: 'Log Activity',
+      description: 'Track calories burned',
+      icon: Activity,
+      href: '/dashboard/activity',
+      color: 'bg-red-600',
     },
     {
       title: 'Messages',

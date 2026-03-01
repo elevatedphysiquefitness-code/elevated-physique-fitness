@@ -23,6 +23,7 @@ import {
   Minus,
   Timer,
 } from 'lucide-react';
+import { estimateWorkoutCalories } from '@/lib/calories';
 
 interface Exercise {
   id: string;
@@ -368,6 +369,38 @@ export default function WorkoutsPage() {
         setSelectedWorkout({ ...selectedWorkout, status: 'completed' });
       }
       setCompletedWorkouts(prev => prev + 1);
+
+      // Auto-log estimated calories burned
+      try {
+        const template = getTemplate(workoutToComplete);
+        const duration = template?.duration_minutes || 45;
+
+        const { data: measurement } = await supabase
+          .from('measurements')
+          .select('weight')
+          .eq('client_id', user.id)
+          .order('measurement_date', { ascending: false })
+          .limit(1)
+          .single();
+
+        const clientWeight = measurement?.weight || 170;
+        const caloriesBurned = estimateWorkoutCalories(duration, null, clientWeight);
+
+        await supabase.from('activity_logs').insert({
+          client_id: user.id,
+          log_date: workoutToComplete.workout_date,
+          activity_type: 'workout',
+          activity_name: template?.name || 'Workout',
+          duration_minutes: duration,
+          intensity: 'low',
+          calories_burned: caloriesBurned,
+          source: 'auto_workout',
+          assigned_workout_id: workoutToComplete.id,
+        });
+      } catch (err) {
+        console.error('Error auto-logging calories:', err);
+      }
+
       // Refresh week schedule
       fetchWorkouts();
     }
@@ -573,6 +606,44 @@ export default function WorkoutsPage() {
 
     // Mark workout as complete
     await markWorkoutComplete();
+
+    // Auto-log estimated calories burned
+    try {
+      const template = getTemplate(displayWorkout);
+      const duration = template?.duration_minutes || 45;
+
+      const allRpes = logsToInsert
+        .filter(l => l.rpe !== null)
+        .map(l => l.rpe as number);
+      const avgRpe = allRpes.length > 0
+        ? allRpes.reduce((a, b) => a + b, 0) / allRpes.length
+        : null;
+
+      const { data: measurement } = await supabase
+        .from('measurements')
+        .select('weight')
+        .eq('client_id', userId)
+        .order('measurement_date', { ascending: false })
+        .limit(1)
+        .single();
+
+      const clientWeight = measurement?.weight || 170;
+      const caloriesBurned = estimateWorkoutCalories(duration, avgRpe, clientWeight);
+
+      await supabase.from('activity_logs').insert({
+        client_id: userId,
+        log_date: workoutDate,
+        activity_type: 'workout',
+        activity_name: template?.name || 'Workout',
+        duration_minutes: duration,
+        intensity: !avgRpe || avgRpe < 5 ? 'low' : avgRpe < 7 ? 'moderate' : avgRpe < 9 ? 'high' : 'very_high',
+        calories_burned: caloriesBurned,
+        source: 'auto_workout',
+        assigned_workout_id: displayWorkout?.id,
+      });
+    } catch (err) {
+      console.error('Error auto-logging calories:', err);
+    }
   };
 
   // Format time for rest timer
