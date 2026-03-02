@@ -24,6 +24,7 @@ import {
   Award,
   ChefHat,
   Activity,
+  Wrench,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 
@@ -416,6 +417,13 @@ export default function DashboardPage() {
       icon: ChefHat,
       href: '/dashboard/meals',
       color: 'bg-teal-600',
+    },
+    {
+      title: 'My Workouts',
+      description: 'Build your own workout',
+      icon: Wrench,
+      href: '/dashboard/my-workouts',
+      color: 'bg-indigo-600',
     },
     {
       title: 'Log Activity',

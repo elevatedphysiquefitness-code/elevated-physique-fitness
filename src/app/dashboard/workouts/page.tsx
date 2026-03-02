@@ -708,6 +708,10 @@ export default function WorkoutsPage() {
                 <Sparkles className="mr-2 h-5 w-5" />
                 Generate AI Workout
               </Button>
+              <Button href="/dashboard/my-workouts" variant="outline">
+                <Dumbbell className="mr-2 h-5 w-5" />
+                Create Your Own
+              </Button>
               <Button href="/dashboard/messages" variant="outline">
                 Message Your Coach
               </Button>
@@ -1062,11 +1066,17 @@ export default function WorkoutsPage() {
                 <h3 className="text-lg font-bold text-black mb-2">
                   {isCurrentWeek ? 'No Workout Today' : 'Select a Workout'}
                 </h3>
-                <p className="text-grey-600">
+                <p className="text-grey-600 mb-4">
                   {isCurrentWeek
-                    ? 'Check your schedule for upcoming workouts this week.'
+                    ? 'Check your schedule for upcoming workouts this week, or create your own.'
                     : 'Click on a workout from the schedule to view details.'}
                 </p>
+                {isCurrentWeek && (
+                  <Button href="/dashboard/my-workouts" variant="outline" size="sm">
+                    <Dumbbell className="mr-2 h-4 w-4" />
+                    Create Your Own
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}

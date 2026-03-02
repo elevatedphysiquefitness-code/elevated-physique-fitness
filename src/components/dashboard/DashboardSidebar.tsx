@@ -23,6 +23,7 @@ import {
   Award,
   ChefHat,
   Activity,
+  Wrench,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -30,6 +31,7 @@ import { useRouter } from 'next/navigation';
 const navigation = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Workouts', href: '/dashboard/workouts', icon: Dumbbell },
+  { name: 'My Workouts', href: '/dashboard/my-workouts', icon: Wrench },
   { name: 'Progress', href: '/dashboard/progress', icon: TrendingUp },
   { name: 'Nutrition', href: '/dashboard/nutrition', icon: Apple },
   { name: 'Food History', href: '/dashboard/food-history', icon: UtensilsCrossed },
