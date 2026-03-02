@@ -44,7 +44,7 @@ export async function POST(request: Request) {
           notificationType: 'message',
           payload: {
             title: `New message from ${senderName}`,
-            body: messagePreview?.substring(0, 100) || 'You have a new message',
+            body: (messagePreview && messagePreview !== 'Sent a photo' ? messagePreview.substring(0, 100) : messagePreview) || 'You have a new message',
             url: dashboardUrl,
             tag: 'message',
           },

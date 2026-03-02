@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Send, MessageSquare, Users, ArrowLeft } from 'lucide-react';
+import { uploadFile } from '@/lib/supabase/storage';
+import { Send, MessageSquare, Users, ArrowLeft, ImagePlus, X } from 'lucide-react';
 import Button from '@/components/ui/Button';
 
 interface Message {
@@ -12,6 +13,7 @@ interface Message {
   receiver_id: string;
   created_at: string;
   read: boolean;
+  image_url?: string;
 }
 
 interface ChatUser {
@@ -37,6 +39,11 @@ export default function MessagesPage() {
   const [chatUsers, setChatUsers] = useState<ChatUser[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showUserList, setShowUserList] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -164,16 +171,17 @@ export default function MessagesPage() {
           // Get last message
           const { data: lastMessages } = await supabase
             .from('messages')
-            .select('content, created_at')
+            .select('content, created_at, image_url')
             .or(`and(sender_id.eq.${client.id},receiver_id.eq.${adminId}),and(sender_id.eq.${adminId},receiver_id.eq.${client.id})`)
             .order('created_at', { ascending: false })
             .limit(1);
 
+          const lastMsg = lastMessages?.[0];
           return {
             ...client,
             unread_count: unreadCount || 0,
-            last_message: lastMessages?.[0]?.content,
-            last_message_time: lastMessages?.[0]?.created_at,
+            last_message: lastMsg?.content || (lastMsg?.image_url ? 'Sent a photo' : undefined),
+            last_message_time: lastMsg?.created_at,
           };
         })
       );
@@ -238,21 +246,58 @@ export default function MessagesPage() {
     setLoading(false);
   };
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file.');
+      return;
+    }
+    setSelectedImage(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setImagePreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const clearSelectedImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || sending || !chatPartnerId) return;
+    if ((!newMessage.trim() && !selectedImage) || sending || !chatPartnerId) return;
 
     setSending(true);
     const supabase = createClient();
 
     try {
+      let imageUrl: string | undefined;
+
+      // Upload image if selected
+      if (selectedImage) {
+        setUploading(true);
+        const path = `${userId}/${Date.now()}.jpg`;
+        const result = await uploadFile('message-images', path, selectedImage);
+        setUploading(false);
+
+        if ('error' in result) {
+          alert('Failed to upload image. Please try again.');
+          setSending(false);
+          return;
+        }
+        imageUrl = result.url;
+      }
+
       const { data, error } = await supabase
         .from('messages')
         .insert({
-          content: newMessage.trim(),
+          content: newMessage.trim() || '',
           sender_id: userId,
           receiver_id: chatPartnerId,
           read: false,
+          ...(imageUrl && { image_url: imageUrl }),
         })
         .select()
         .single();
@@ -267,6 +312,7 @@ export default function MessagesPage() {
         });
 
         // Send notification to receiver
+        const preview = newMessage.trim() || (imageUrl ? 'Sent a photo' : '');
         try {
           await fetch('/api/messages/notify', {
             method: 'POST',
@@ -274,7 +320,7 @@ export default function MessagesPage() {
             body: JSON.stringify({
               receiverId: chatPartnerId,
               senderName: userName,
-              messagePreview: newMessage.trim(),
+              messagePreview: preview,
             }),
           });
         } catch (notifyError) {
@@ -282,6 +328,7 @@ export default function MessagesPage() {
         }
 
         setNewMessage('');
+        clearSelectedImage();
       }
     } catch (err) {
       console.error('Error sending message:', err);
@@ -485,20 +532,32 @@ export default function MessagesPage() {
                       className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
-                        className={`max-w-[75%] p-4 ${
+                        className={`max-w-[75%] ${message.image_url ? 'p-1' : 'p-4'} ${
                           isOwn
                             ? 'bg-blue-600 text-white'
                             : 'bg-grey-100 text-black'
                         }`}
                       >
-                        <p className="text-sm">{message.content}</p>
-                        <p
-                          className={`text-xs mt-2 ${
-                            isOwn ? 'text-blue-200' : 'text-grey-500'
-                          }`}
-                        >
-                          {formatTime(message.created_at)}
-                        </p>
+                        {message.image_url && (
+                          <img
+                            src={message.image_url}
+                            alt="Shared image"
+                            className="max-w-full max-h-64 object-contain cursor-pointer"
+                            onClick={() => setLightboxUrl(message.image_url!)}
+                          />
+                        )}
+                        <div className={message.image_url ? 'px-3 py-2' : ''}>
+                          {message.content && (
+                            <p className="text-sm">{message.content}</p>
+                          )}
+                          <p
+                            className={`text-xs ${message.content ? 'mt-2' : ''} ${
+                              isOwn ? 'text-blue-200' : 'text-grey-500'
+                            }`}
+                          >
+                            {formatTime(message.created_at)}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   );
@@ -516,9 +575,38 @@ export default function MessagesPage() {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Image Preview */}
+      {imagePreview && (
+        <div className="px-4 pt-3 border-t border-grey-200 bg-grey-50">
+          <div className="relative inline-block">
+            <img src={imagePreview} alt="Preview" className="h-20 object-contain" />
+            <button
+              onClick={clearSelectedImage}
+              className="absolute -top-2 -right-2 w-6 h-6 bg-black text-white flex items-center justify-center rounded-full"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Message Input */}
       <form onSubmit={sendMessage} className="p-4 border-t border-grey-200">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageSelect}
+          className="hidden"
+        />
         <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="p-3 text-grey-500 hover:text-blue-600 transition-colors"
+          >
+            <ImagePlus className="h-5 w-5" />
+          </button>
           <input
             type="text"
             value={newMessage}
@@ -529,12 +617,37 @@ export default function MessagesPage() {
           <Button
             type="submit"
             variant="primary"
-            disabled={sending || !newMessage.trim()}
+            disabled={sending || (!newMessage.trim() && !selectedImage)}
           >
-            <Send className="h-5 w-5" />
+            {uploading ? (
+              <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Send className="h-5 w-5" />
+            )}
           </Button>
         </div>
       </form>
+
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 text-white p-2"
+          >
+            <X className="h-8 w-8" />
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Full size"
+            className="max-w-full max-h-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Send, Search } from 'lucide-react';
+import { uploadFile } from '@/lib/supabase/storage';
+import { Send, Search, ImagePlus, X } from 'lucide-react';
 import Button from '@/components/ui/Button';
 
 interface Client {
@@ -20,6 +21,7 @@ interface Message {
   sender_id: string;
   created_at: string;
   read: boolean;
+  image_url?: string;
 }
 
 export default function AdminMessagesPage() {
@@ -31,6 +33,11 @@ export default function AdminMessagesPage() {
   const [sending, setSending] = useState(false);
   const [adminId, setAdminId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -123,19 +130,56 @@ export default function AdminMessagesPage() {
     }
   };
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file.');
+      return;
+    }
+    setSelectedImage(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setImagePreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const clearSelectedImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedClient || sending) return;
+    if ((!newMessage.trim() && !selectedImage) || !selectedClient || sending) return;
 
     setSending(true);
     const supabase = createClient();
 
+    let imageUrl: string | undefined;
+
+    // Upload image if selected
+    if (selectedImage) {
+      setUploading(true);
+      const path = `${adminId}/${Date.now()}.jpg`;
+      const result = await uploadFile('message-images', path, selectedImage);
+      setUploading(false);
+
+      if ('error' in result) {
+        alert('Failed to upload image. Please try again.');
+        setSending(false);
+        return;
+      }
+      imageUrl = result.url;
+    }
+
     const { data, error } = await supabase
       .from('messages')
       .insert({
-        content: newMessage.trim(),
+        content: newMessage.trim() || '',
         sender_id: adminId,
         receiver_id: selectedClient.id,
+        ...(imageUrl && { image_url: imageUrl }),
       })
       .select()
       .single();
@@ -147,6 +191,7 @@ export default function AdminMessagesPage() {
       setMessages([...messages, data]);
 
       // Send notification to client
+      const preview = newMessage.trim() || (imageUrl ? 'Sent a photo' : '');
       try {
         await fetch('/api/messages/notify', {
           method: 'POST',
@@ -154,7 +199,7 @@ export default function AdminMessagesPage() {
           body: JSON.stringify({
             receiverId: selectedClient.id,
             senderName: 'Your Coach',
-            messagePreview: newMessage.trim(),
+            messagePreview: preview,
           }),
         });
       } catch (notifyError) {
@@ -162,6 +207,7 @@ export default function AdminMessagesPage() {
       }
 
       setNewMessage('');
+      clearSelectedImage();
     }
 
     setSending(false);
@@ -258,20 +304,32 @@ export default function AdminMessagesPage() {
                     className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`max-w-[75%] p-4 ${
+                      className={`max-w-[75%] ${message.image_url ? 'p-1' : 'p-4'} ${
                         isOwn
                           ? 'bg-blue-600 text-white'
                           : 'bg-grey-100 text-black'
                       }`}
                     >
-                      <p className="text-sm">{message.content}</p>
-                      <p
-                        className={`text-xs mt-2 ${
-                          isOwn ? 'text-blue-200' : 'text-grey-500'
-                        }`}
-                      >
-                        {formatTime(message.created_at)}
-                      </p>
+                      {message.image_url && (
+                        <img
+                          src={message.image_url}
+                          alt="Shared image"
+                          className="max-w-full max-h-64 object-contain cursor-pointer"
+                          onClick={() => setLightboxUrl(message.image_url!)}
+                        />
+                      )}
+                      <div className={message.image_url ? 'px-3 py-2' : ''}>
+                        {message.content && (
+                          <p className="text-sm">{message.content}</p>
+                        )}
+                        <p
+                          className={`text-xs ${message.content ? 'mt-2' : ''} ${
+                            isOwn ? 'text-blue-200' : 'text-grey-500'
+                          }`}
+                        >
+                          {formatTime(message.created_at)}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 );
@@ -284,9 +342,38 @@ export default function AdminMessagesPage() {
               <div ref={messagesEndRef} />
             </div>
 
+            {/* Image Preview */}
+            {imagePreview && (
+              <div className="px-4 pt-3 border-t border-grey-200 bg-grey-50">
+                <div className="relative inline-block">
+                  <img src={imagePreview} alt="Preview" className="h-20 object-contain" />
+                  <button
+                    onClick={clearSelectedImage}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-black text-white flex items-center justify-center rounded-full"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Input */}
             <form onSubmit={sendMessage} className="p-4 border-t border-grey-200">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="hidden"
+              />
               <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-3 text-grey-500 hover:text-blue-600 transition-colors"
+                >
+                  <ImagePlus className="h-5 w-5" />
+                </button>
                 <input
                   type="text"
                   value={newMessage}
@@ -294,8 +381,12 @@ export default function AdminMessagesPage() {
                   placeholder="Type your message..."
                   className="flex-1 border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
                 />
-                <Button type="submit" variant="primary" disabled={sending || !newMessage.trim()}>
-                  <Send className="h-5 w-5" />
+                <Button type="submit" variant="primary" disabled={sending || (!newMessage.trim() && !selectedImage)}>
+                  {uploading ? (
+                    <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Send className="h-5 w-5" />
+                  )}
                 </Button>
               </div>
             </form>
@@ -306,6 +397,27 @@ export default function AdminMessagesPage() {
           </div>
         )}
       </div>
+
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 text-white p-2"
+          >
+            <X className="h-8 w-8" />
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Full size"
+            className="max-w-full max-h-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }
