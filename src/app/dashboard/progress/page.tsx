@@ -26,6 +26,8 @@ import {
   Target,
   Trophy,
   Flag,
+  Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 
 interface Measurement {
@@ -105,6 +107,12 @@ export default function ProgressPage() {
   const [newHabitName, setNewHabitName] = useState('');
   const [newHabitDescription, setNewHabitDescription] = useState('');
   const todayStr = new Date().toISOString().split('T')[0];
+
+  // AI Tips state
+  const [habitTips, setHabitTips] = useState<{ title: string; tip: string; actionStep: string }[]>([]);
+  const [goalTips, setGoalTips] = useState<{ title: string; tip: string; actionStep: string }[]>([]);
+  const [loadingHabitTips, setLoadingHabitTips] = useState(false);
+  const [loadingGoalTips, setLoadingGoalTips] = useState(false);
 
   // Goals state
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -553,6 +561,60 @@ export default function ProgressPage() {
   const completedCount = Object.values(todayLogs).filter(Boolean).length;
   const habitCompletionRate = habits.length > 0 ? Math.round((completedCount / habits.length) * 100) : 0;
 
+  const fetchCoachingTips = async (section: 'habits' | 'goals') => {
+    if (section === 'habits') {
+      setLoadingHabitTips(true);
+    } else {
+      setLoadingGoalTips(true);
+    }
+
+    try {
+      const habitData = habits.map(h => ({
+        name: h.name,
+        completedToday: todayLogs[h.id] || false,
+        weeklyRate: weeklyPercentage,
+        streak,
+      }));
+
+      const goalData = goals.map(g => ({
+        title: g.title,
+        goalType: g.goal_type,
+        targetValue: g.target_value,
+        currentValue: g.goal_type === 'body_fat'
+          ? (measurements[measurements.length - 1]?.body_fat_percentage ?? null)
+          : (measurements[measurements.length - 1]?.weight ?? null),
+        progress: getGoalProgress(g),
+        targetDate: g.target_date,
+      }));
+
+      const res = await fetch('/api/ai/coaching-tips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ habits: habitData, goals: goalData, section }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.tips) {
+        if (section === 'habits') {
+          setHabitTips(data.tips);
+        } else {
+          setGoalTips(data.tips);
+        }
+      } else {
+        alert('Failed to generate tips. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error fetching coaching tips:', err);
+      alert('Failed to generate tips. Please try again.');
+    } finally {
+      if (section === 'habits') {
+        setLoadingHabitTips(false);
+      } else {
+        setLoadingGoalTips(false);
+      }
+    }
+  };
+
   // Calculate key metrics
   const latestMeasurement = measurements.length > 0 ? measurements[measurements.length - 1] : null;
   const startingMeasurement = measurements.length > 0 ? measurements[0] : null;
@@ -812,6 +874,55 @@ export default function ProgressPage() {
             )}
           </div>
 
+          {/* AI Coaching Tips */}
+          {habits.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-black">Coaching Tips</h2>
+                <Button
+                  onClick={() => fetchCoachingTips('habits')}
+                  variant={habitTips.length > 0 ? 'outline' : 'primary'}
+                  disabled={loadingHabitTips}
+                >
+                  {loadingHabitTips ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : habitTips.length > 0 ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh Tips
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Get Coaching Tips
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {habitTips.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {habitTips.map((tip, i) => (
+                    <div key={i} className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 p-5">
+                      <div className="flex items-start gap-3 mb-3">
+                        <Sparkles className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                        <h3 className="font-semibold text-black">{tip.title}</h3>
+                      </div>
+                      <p className="text-sm text-grey-700 mb-3">{tip.tip}</p>
+                      <div className="bg-white/70 border border-blue-100 p-3">
+                        <p className="text-xs font-semibold text-blue-600 uppercase mb-1">Action Step</p>
+                        <p className="text-sm text-black">{tip.actionStep}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Add Habit Modal */}
           {showHabitModal && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -946,20 +1057,66 @@ export default function ProgressPage() {
             )}
           </div>
 
-          {/* Goal Tips */}
-          <div className="bg-blue-50 border border-blue-200 p-6">
-            <div className="flex items-start gap-3">
-              <Flag className="h-6 w-6 text-blue-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <h3 className="font-semibold text-blue-800 mb-1">Tips for Setting Goals</h3>
-                <ul className="text-sm text-blue-700 space-y-1">
-                  <li>Set specific, measurable targets (e.g., &quot;lose 10 lbs&quot; instead of &quot;lose weight&quot;)</li>
-                  <li>Give yourself a realistic timeline to achieve your goals</li>
-                  <li>Log your measurements regularly to track progress accurately</li>
-                  <li>Celebrate small wins along the way!</li>
-                </ul>
-              </div>
+          {/* AI Goal Tips */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-black">Coaching Tips</h2>
+              <Button
+                onClick={() => fetchCoachingTips('goals')}
+                variant={goalTips.length > 0 ? 'outline' : 'primary'}
+                disabled={loadingGoalTips}
+              >
+                {loadingGoalTips ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : goalTips.length > 0 ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh Tips
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Get Coaching Tips
+                  </>
+                )}
+              </Button>
             </div>
+
+            {goalTips.length === 0 ? (
+              <div className="bg-blue-50 border border-blue-200 p-6">
+                <div className="flex items-start gap-3">
+                  <Flag className="h-6 w-6 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-blue-800 mb-1">Tips for Setting Goals</h3>
+                    <ul className="text-sm text-blue-700 space-y-1">
+                      <li>Set specific, measurable targets (e.g., &quot;lose 10 lbs&quot; instead of &quot;lose weight&quot;)</li>
+                      <li>Give yourself a realistic timeline to achieve your goals</li>
+                      <li>Log your measurements regularly to track progress accurately</li>
+                      <li>Celebrate small wins along the way!</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {goalTips.map((tip, i) => (
+                  <div key={i} className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 p-5">
+                    <div className="flex items-start gap-3 mb-3">
+                      <Sparkles className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                      <h3 className="font-semibold text-black">{tip.title}</h3>
+                    </div>
+                    <p className="text-sm text-grey-700 mb-3">{tip.tip}</p>
+                    <div className="bg-white/70 border border-green-100 p-3">
+                      <p className="text-xs font-semibold text-green-600 uppercase mb-1">Action Step</p>
+                      <p className="text-sm text-black">{tip.actionStep}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Add Goal Modal */}
