@@ -306,6 +306,10 @@ export default function NutritionPage() {
     notes: '',
   });
 
+  // AI Nutrition Tips state
+  const [nutritionTips, setNutritionTips] = useState<{ title: string; tip: string; actionStep: string }[]>([]);
+  const [loadingNutritionTips, setLoadingNutritionTips] = useState(false);
+
   // Food search state
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<FoodSearchResult[]>([]);
@@ -557,6 +561,48 @@ export default function NutritionPage() {
   const calculatePercentage = (consumed: number, target: number) => {
     if (target === 0) return 0;
     return Math.min(Math.round((consumed / target) * 100), 100);
+  };
+
+  const fetchNutritionTips = async () => {
+    if (!macros) {
+      alert('Please calculate your macros first to get personalized tips.');
+      return;
+    }
+    setLoadingNutritionTips(true);
+    try {
+      const res = await fetch('/api/ai/coaching-tips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          habits: [],
+          goals: [],
+          nutrition: {
+            goal: clientData.goal || 'maintenance',
+            targetCalories: macros.calories,
+            targetProtein: macros.protein,
+            targetCarbs: macros.carbs,
+            targetFat: macros.fats,
+            consumedCalories: consumedMacros.calories,
+            consumedProtein: Math.round(consumedMacros.protein),
+            consumedCarbs: Math.round(consumedMacros.carbs),
+            consumedFat: Math.round(consumedMacros.fat),
+            recentFoods: foodLogs.map(l => `${l.food_name} (${l.calories} cal, ${l.protein}g protein)`),
+          },
+          section: 'nutrition',
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.tips) {
+        setNutritionTips(data.tips);
+      } else {
+        alert('Failed to generate tips. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error fetching nutrition tips:', err);
+      alert('Failed to generate tips. Please try again.');
+    } finally {
+      setLoadingNutritionTips(false);
+    }
   };
 
   const handleCalculate = () => {
@@ -1643,27 +1689,73 @@ export default function NutritionPage() {
         </Card>
       )}
 
-      {/* Core Principles */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {nutritionPrinciples.map((principle) => (
-          <div key={principle.title} className="bg-white p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-green-600 flex items-center justify-center">
-                <principle.icon className="h-6 w-6 text-white" />
+      {/* AI Nutrition Coaching Tips */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-black">Nutrition Coaching Tips</h2>
+          <Button
+            onClick={fetchNutritionTips}
+            variant={nutritionTips.length > 0 ? 'outline' : 'primary'}
+            disabled={loadingNutritionTips}
+          >
+            {loadingNutritionTips ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : nutritionTips.length > 0 ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh Tips
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4 mr-2" />
+                Get Coaching Tips
+              </>
+            )}
+          </Button>
+        </div>
+
+        {nutritionTips.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {nutritionTips.map((tip, i) => (
+              <div key={i} className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 p-5">
+                <div className="flex items-start gap-3 mb-3">
+                  <Sparkles className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <h3 className="font-semibold text-black">{tip.title}</h3>
+                </div>
+                <p className="text-sm text-grey-700 mb-3">{tip.tip}</p>
+                <div className="bg-white/70 border border-green-100 p-3">
+                  <p className="text-xs font-semibold text-green-600 uppercase mb-1">Action Step</p>
+                  <p className="text-sm text-black">{tip.actionStep}</p>
+                </div>
               </div>
-              <h2 className="text-lg font-bold text-black">{principle.title}</h2>
-            </div>
-            <p className="text-grey-600 mb-4">{principle.description}</p>
-            <ul className="space-y-2">
-              {principle.tips.map((tip, index) => (
-                <li key={index} className="flex items-start gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0 mt-1" />
-                  <span className="text-sm text-grey-700">{tip}</span>
-                </li>
-              ))}
-            </ul>
+            ))}
           </div>
-        ))}
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {nutritionPrinciples.map((principle) => (
+              <div key={principle.title} className="bg-white p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-green-600 flex items-center justify-center">
+                    <principle.icon className="h-6 w-6 text-white" />
+                  </div>
+                  <h2 className="text-lg font-bold text-black">{principle.title}</h2>
+                </div>
+                <p className="text-grey-600 mb-4">{principle.description}</p>
+                <ul className="space-y-2">
+                  {principle.tips.map((tip, index) => (
+                    <li key={index} className="flex items-start gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0 mt-1" />
+                      <span className="text-sm text-grey-700">{tip}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Meal Timing */}
@@ -1679,37 +1771,6 @@ export default function NutritionPage() {
               </div>
             </div>
           ))}
-        </div>
-      </div>
-
-      {/* Additional Tips */}
-      <div className="bg-white p-6">
-        <h2 className="text-lg font-bold text-black mb-4">Additional Tips</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="p-4 bg-grey-50">
-            <p className="font-medium text-black">Meal Prep</p>
-            <p className="text-sm text-grey-600 mt-1">
-              Prepare meals in advance to stay consistent and avoid unhealthy choices when busy.
-            </p>
-          </div>
-          <div className="p-4 bg-grey-50">
-            <p className="font-medium text-black">Track Your Food</p>
-            <p className="text-sm text-grey-600 mt-1">
-              Use the food log above to track intake and build awareness of your eating habits.
-            </p>
-          </div>
-          <div className="p-4 bg-grey-50">
-            <p className="font-medium text-black">80/20 Rule</p>
-            <p className="text-sm text-grey-600 mt-1">
-              Aim for 80% whole, nutritious foods. 20% can be flexible for sustainability.
-            </p>
-          </div>
-          <div className="p-4 bg-grey-50">
-            <p className="font-medium text-black">Listen to Your Body</p>
-            <p className="text-sm text-grey-600 mt-1">
-              Eat when hungry, stop when satisfied. Pay attention to how foods make you feel.
-            </p>
-          </div>
         </div>
       </div>
 
