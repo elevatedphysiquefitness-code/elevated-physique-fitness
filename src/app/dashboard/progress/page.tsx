@@ -480,7 +480,7 @@ export default function ProgressPage() {
 
     const { error } = await supabase.from('client_goals').insert({
       client_id: user.id,
-      goal_type: newGoal.goal_type === 'weight_loss' || newGoal.goal_type === 'weight_gain' ? 'weight' : newGoal.goal_type,
+      goal_type: newGoal.goal_type,
       title: goalTypeLabels[newGoal.goal_type],
       target_value: parseFloat(newGoal.target_value),
       target_unit: newGoal.goal_type === 'body_fat' ? '%' : 'lbs',
@@ -490,7 +490,10 @@ export default function ProgressPage() {
       status: 'active',
     });
 
-    if (!error) {
+    if (error) {
+      console.error('Error saving goal:', error);
+      alert('Failed to save goal. Please try again.');
+    } else {
       setNewGoal({ goal_type: 'weight_loss', target_value: '', target_date: '' });
       setShowGoalModal(false);
       fetchGoals();
@@ -518,12 +521,12 @@ export default function ProgressPage() {
     const currentWeight = measurements[measurements.length - 1]?.weight || goal.start_value;
     const currentBf = measurements[measurements.length - 1]?.body_fat_percentage || goal.start_value;
 
-    if (goal.goal_type === 'weight' && goal.target_value < goal.start_value) {
+    if ((goal.goal_type === 'weight_loss' || goal.goal_type === 'weight') && goal.target_value < goal.start_value) {
       // Weight loss goal
       const totalToLose = goal.start_value - goal.target_value;
       const lost = goal.start_value - currentWeight;
       return totalToLose > 0 ? Math.min(100, Math.max(0, Math.round((lost / totalToLose) * 100))) : 0;
-    } else if (goal.goal_type === 'weight' && goal.target_value > goal.start_value) {
+    } else if ((goal.goal_type === 'weight_gain' || goal.goal_type === 'weight') && goal.target_value > goal.start_value) {
       // Weight gain goal
       const totalToGain = goal.target_value - goal.start_value;
       const gained = currentWeight - goal.start_value;
@@ -533,6 +536,11 @@ export default function ProgressPage() {
       const totalToLose = goal.start_value - goal.target_value;
       const lost = goal.start_value - currentBf;
       return totalToLose > 0 ? Math.min(100, Math.max(0, Math.round((lost / totalToLose) * 100))) : 0;
+    } else if (goal.goal_type === 'muscle_mass') {
+      // Muscle mass gain goal
+      const totalToGain = goal.target_value - goal.start_value;
+      const gained = currentWeight - goal.start_value;
+      return totalToGain > 0 ? Math.min(100, Math.max(0, Math.round((gained / totalToGain) * 100))) : 0;
     }
     return 0;
   };

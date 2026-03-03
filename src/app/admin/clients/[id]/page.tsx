@@ -153,6 +153,19 @@ interface CheckIn {
   notes: string | null;
 }
 
+interface ClientGoal {
+  id: string;
+  goal_type: string;
+  title: string;
+  target_value: number;
+  target_unit: string;
+  current_value: number | null;
+  start_value: number | null;
+  target_date: string | null;
+  status: string;
+  created_at: string;
+}
+
 interface Subscription {
   id: string;
   user_id: string;
@@ -235,6 +248,7 @@ export default function ClientDetailPage() {
   const [sleepLogs, setSleepLogs] = useState<SleepLog[]>([]);
   const [habitLogs, setHabitLogs] = useState<HabitLog[]>([]);
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
+  const [clientGoals, setClientGoals] = useState<ClientGoal[]>([]);
 
   // Workout edit state
   const [editingWorkout, setEditingWorkout] = useState<AssignedWorkout | null>(null);
@@ -530,6 +544,18 @@ export default function ClientDetailPage() {
 
     if (checkInData) {
       setCheckIns(checkInData);
+    }
+
+    // Fetch client goals
+    const { data: goalsData } = await supabase
+      .from('client_goals')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false });
+
+    if (goalsData) {
+      setClientGoals(goalsData);
     }
 
     // Fetch subscription
@@ -1407,6 +1433,68 @@ export default function ClientDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Client Goals */}
+        {clientGoals.length > 0 && (
+          <Card>
+            <CardHeader>
+              <h2 className="font-semibold text-black flex items-center gap-2">
+                <Target className="h-5 w-5 text-green-600" />
+                Active Goals
+              </h2>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {clientGoals.map((goal) => {
+                  const latestWeight = measurements[measurements.length - 1]?.weight;
+                  const latestBf = measurements[measurements.length - 1]?.body_fat_percentage;
+                  const currentVal = goal.goal_type === 'body_fat' ? latestBf : latestWeight;
+                  const unit = goal.target_unit || (goal.goal_type === 'body_fat' ? '%' : 'lbs');
+
+                  let progress = 0;
+                  if (goal.start_value && goal.target_value && currentVal) {
+                    if (goal.target_value < goal.start_value) {
+                      const total = goal.start_value - goal.target_value;
+                      const done = goal.start_value - currentVal;
+                      progress = total > 0 ? Math.min(100, Math.max(0, Math.round((done / total) * 100))) : 0;
+                    } else {
+                      const total = goal.target_value - goal.start_value;
+                      const done = currentVal - goal.start_value;
+                      progress = total > 0 ? Math.min(100, Math.max(0, Math.round((done / total) * 100))) : 0;
+                    }
+                  }
+
+                  return (
+                    <div key={goal.id} className="border border-grey-200 p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="font-medium text-black text-sm">{goal.title}</p>
+                        <span className={`text-xs font-medium ${progress >= 100 ? 'text-green-600' : 'text-blue-600'}`}>
+                          {progress}%
+                        </span>
+                      </div>
+                      <div className="h-2 bg-grey-200 mb-2">
+                        <div
+                          className={`h-full transition-all ${progress >= 100 ? 'bg-green-600' : 'bg-blue-600'}`}
+                          style={{ width: `${Math.min(100, progress)}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-grey-500">
+                        <span>Start: {goal.start_value ?? '--'}{unit}</span>
+                        <span>Current: {currentVal ?? '--'}{unit}</span>
+                        <span>Target: {goal.target_value}{unit}</span>
+                      </div>
+                      {goal.target_date && (
+                        <p className="text-xs text-grey-400 mt-1">
+                          By {new Date(goal.target_date).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Current Program */}
         <Card>
