@@ -88,7 +88,7 @@ export default function SubscriptionPage() {
 
   const formatPrice = (price: number, cycle: string) => {
     const interval = cycle || 'monthly';
-    const cycleLabel = interval === 'weekly' ? '/week' : interval === 'biweekly' || interval === 'bi-weekly' ? '/2 weeks' : '/month';
+    const cycleLabel = interval === 'weekly' ? '/week' : interval === 'biweekly' || interval === 'bi-weekly' ? '/2 weeks' : interval === 'semimonthly' ? '/2x mo' : '/month';
     return `$${price}${cycleLabel}`;
   };
 

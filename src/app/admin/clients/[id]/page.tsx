@@ -178,6 +178,8 @@ interface Subscription {
   price: number | null;
   payment_method: string | null;
   notes: string | null;
+  billing_day_1: number | null;
+  billing_day_2: number | null;
 }
 
 interface WorkoutTemplate {
@@ -285,6 +287,8 @@ export default function ClientDetailPage() {
     price: '',
     payment_method: 'external',
     notes: '',
+    billing_day_1: '',
+    billing_day_2: '',
   });
 
   useEffect(() => {
@@ -1120,6 +1124,8 @@ export default function ClientDetailPage() {
         price: subscription.price?.toString() || '',
         payment_method: subscription.payment_method || 'external',
         notes: subscription.notes || '',
+        billing_day_1: subscription.billing_day_1?.toString() || '',
+        billing_day_2: subscription.billing_day_2?.toString() || '',
       });
     } else {
       setSubscriptionForm({
@@ -1132,6 +1138,8 @@ export default function ClientDetailPage() {
         price: '',
         payment_method: 'external',
         notes: '',
+        billing_day_1: '',
+        billing_day_2: '',
       });
     }
     setShowSubscriptionModal(true);
@@ -1143,21 +1151,35 @@ export default function ClientDetailPage() {
       return;
     }
 
+    if (subscriptionForm.billing_interval === 'semimonthly' && (!subscriptionForm.billing_day_1 || !subscriptionForm.billing_day_2)) {
+      alert('Please enter both billing days for semi-monthly billing');
+      return;
+    }
+
     setSaving(true);
     const supabase = createClient();
+
+    const billingDay1 = subscriptionForm.billing_day_1 ? parseInt(subscriptionForm.billing_day_1) : null;
+    const billingDay2 = subscriptionForm.billing_day_2 ? parseInt(subscriptionForm.billing_day_2) : null;
 
     // Calculate next billing date if not provided
     let nextBillingDate = subscriptionForm.next_billing_date;
     if (!nextBillingDate && subscriptionForm.start_date) {
-      const startDate = new Date(subscriptionForm.start_date);
-      if (subscriptionForm.billing_interval === 'weekly') {
-        startDate.setDate(startDate.getDate() + 7);
-      } else if (subscriptionForm.billing_interval === 'biweekly') {
-        startDate.setDate(startDate.getDate() + 14);
+      if (subscriptionForm.billing_interval === 'semimonthly' && billingDay1 && billingDay2) {
+        // For semi-monthly, find next billing day from start date
+        const { getNextBillingDate: calcNext } = await import('@/lib/billing');
+        nextBillingDate = calcNext('semimonthly', new Date(subscriptionForm.start_date), billingDay1, billingDay2);
       } else {
-        startDate.setMonth(startDate.getMonth() + 1);
+        const startDate = new Date(subscriptionForm.start_date);
+        if (subscriptionForm.billing_interval === 'weekly') {
+          startDate.setDate(startDate.getDate() + 7);
+        } else if (subscriptionForm.billing_interval === 'biweekly') {
+          startDate.setDate(startDate.getDate() + 14);
+        } else {
+          startDate.setMonth(startDate.getMonth() + 1);
+        }
+        nextBillingDate = startDate.toISOString().split('T')[0];
       }
-      nextBillingDate = startDate.toISOString().split('T')[0];
     }
 
     const subscriptionData = {
@@ -1171,6 +1193,8 @@ export default function ClientDetailPage() {
       price: subscriptionForm.price ? parseFloat(subscriptionForm.price) : null,
       payment_method: subscriptionForm.payment_method,
       notes: subscriptionForm.notes || null,
+      billing_day_1: billingDay1,
+      billing_day_2: billingDay2,
     };
 
     let error;
@@ -2600,6 +2624,7 @@ export default function ClientDetailPage() {
                     >
                       <option value="weekly">Weekly</option>
                       <option value="biweekly">Bi-weekly</option>
+                      <option value="semimonthly">Semi-Monthly (2x/month)</option>
                       <option value="monthly">Monthly</option>
                     </select>
                   </div>
@@ -2618,6 +2643,42 @@ export default function ClientDetailPage() {
                     </select>
                   </div>
                 </div>
+
+                {subscriptionForm.billing_interval === 'semimonthly' && (
+                  <div className="grid grid-cols-2 gap-4 bg-blue-50 p-4 border border-blue-200">
+                    <div>
+                      <label className="block text-sm font-medium text-black mb-2">
+                        1st Billing Day
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="28"
+                        placeholder="e.g. 11"
+                        value={subscriptionForm.billing_day_1}
+                        onChange={(e) => setSubscriptionForm({ ...subscriptionForm, billing_day_1: e.target.value })}
+                        className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-black mb-2">
+                        2nd Billing Day
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="28"
+                        placeholder="e.g. 25"
+                        value={subscriptionForm.billing_day_2}
+                        onChange={(e) => setSubscriptionForm({ ...subscriptionForm, billing_day_2: e.target.value })}
+                        className="w-full border border-grey-300 px-4 py-3 text-black focus:outline-none focus:border-blue-600"
+                      />
+                    </div>
+                    <p className="col-span-2 text-xs text-grey-500">
+                      Client will be billed on these two days each month (max day 28 to avoid month-end issues).
+                    </p>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>

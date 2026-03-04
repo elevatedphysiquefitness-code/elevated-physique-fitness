@@ -151,29 +151,23 @@ export async function POST(request: Request) {
         const subId = typeof subscriptionId === 'string' ? subscriptionId : subscriptionId?.id;
 
         if (subId && (invoice as { billing_reason?: string }).billing_reason === 'subscription_cycle') {
-          // Get the subscription to find billing interval
+          // Get the subscription to find billing interval and custom days
           const { data: existingSub } = await supabase
             .from('subscriptions')
-            .select('billing_cycle')
+            .select('billing_cycle, billing_interval, billing_day_1, billing_day_2')
             .eq('stripe_subscription_id', subId)
             .single();
 
           if (existingSub) {
-            // Calculate next billing date
-            const nextBillingDate = new Date();
-            if (existingSub.billing_cycle === 'weekly') {
-              nextBillingDate.setDate(nextBillingDate.getDate() + 7);
-            } else if (existingSub.billing_cycle === 'biweekly') {
-              nextBillingDate.setDate(nextBillingDate.getDate() + 14);
-            } else {
-              nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
-            }
+            const { getNextBillingDate } = await import('@/lib/billing');
+            const interval = existingSub.billing_interval || existingSub.billing_cycle || 'monthly';
+            const nextDate = getNextBillingDate(interval, new Date(), existingSub.billing_day_1, existingSub.billing_day_2);
 
             await supabase
               .from('subscriptions')
               .update({
                 status: 'active',
-                next_billing_date: nextBillingDate.toISOString().split('T')[0],
+                next_billing_date: nextDate,
                 updated_at: new Date().toISOString(),
               })
               .eq('stripe_subscription_id', subId);

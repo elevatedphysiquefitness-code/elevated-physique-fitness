@@ -132,30 +132,20 @@ async function handlePaymentCompleted(supabase: SupabaseClient, resource: any) {
   if (subscriptionId) {
     const { data: subscription } = await supabase
       .from('subscriptions')
-      .select('billing_cycle')
+      .select('billing_cycle, billing_interval, billing_day_1, billing_day_2')
       .eq('paypal_subscription_id', subscriptionId)
       .single();
 
     if (subscription) {
-      const today = new Date();
-      let nextBillingDate: Date;
-
-      switch (subscription.billing_cycle) {
-        case 'weekly':
-          nextBillingDate = new Date(today.setDate(today.getDate() + 7));
-          break;
-        case 'bi-weekly':
-          nextBillingDate = new Date(today.setDate(today.getDate() + 14));
-          break;
-        default:
-          nextBillingDate = new Date(today.setMonth(today.getMonth() + 1));
-      }
+      const { getNextBillingDate } = await import('@/lib/billing');
+      const interval = subscription.billing_interval || subscription.billing_cycle || 'monthly';
+      const nextDate = getNextBillingDate(interval, new Date(), subscription.billing_day_1, subscription.billing_day_2);
 
       await supabase
         .from('subscriptions')
         .update({
           status: 'active',
-          next_billing_date: nextBillingDate.toISOString().split('T')[0],
+          next_billing_date: nextDate,
         })
         .eq('paypal_subscription_id', subscriptionId);
     }
