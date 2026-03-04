@@ -30,6 +30,14 @@ interface AdminStats {
   unreadMessages: number;
 }
 
+interface PastDueSubscription {
+  clientName: string;
+  clientId: string;
+  planName: string;
+  amount: string;
+  daysOverdue: number;
+}
+
 interface ClientActivity {
   id: string;
   full_name: string;
@@ -68,6 +76,7 @@ export default function AdminDashboard() {
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'activity'>('overview');
+  const [pastDueSubs, setPastDueSubs] = useState<PastDueSubscription[]>([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -109,6 +118,38 @@ export default function AdminDashboard() {
       pendingCheckIns: checkInCount || 0,
       unreadMessages: messageCount || 0,
     });
+
+    // Fetch past due subscriptions
+    const { data: pastDueData } = await supabase
+      .from('subscriptions')
+      .select('client_id, user_id, plan_name, price, next_billing_date')
+      .in('status', ['active', 'past_due'])
+      .lt('next_billing_date', today);
+
+    if (pastDueData && pastDueData.length > 0) {
+      const pastDueList: PastDueSubscription[] = [];
+      for (const sub of pastDueData) {
+        const cId = sub.client_id || sub.user_id;
+        if (!cId) continue;
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', cId)
+          .single();
+        const due = new Date(sub.next_billing_date + 'T00:00:00');
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        const daysOverdue = Math.ceil((now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+        pastDueList.push({
+          clientName: prof?.full_name || 'Unknown',
+          clientId: cId,
+          planName: sub.plan_name || 'Subscription',
+          amount: sub.price ? Number(sub.price).toFixed(2) : '0.00',
+          daysOverdue,
+        });
+      }
+      setPastDueSubs(pastDueList);
+    }
 
     // Fetch all clients
     const { data: clients } = await supabase
@@ -384,6 +425,34 @@ export default function AdminDashboard() {
           </Link>
         ))}
       </div>
+
+      {/* Past Due Payments Alert */}
+      {pastDueSubs.length > 0 && (
+        <div className="bg-red-50 border border-red-200 p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-red-800">
+                {pastDueSubs.length} Past Due Payment{pastDueSubs.length !== 1 ? 's' : ''}
+              </h3>
+              <div className="mt-2 space-y-1">
+                {pastDueSubs.map((sub) => (
+                  <Link
+                    key={sub.clientId}
+                    href={`/admin/clients/${sub.clientId}`}
+                    className="flex items-center justify-between text-sm p-2 hover:bg-red-100 transition-colors"
+                  >
+                    <span className="text-red-800">{sub.clientName} — {sub.planName}</span>
+                    <span className="text-red-600 font-medium">
+                      ${sub.amount} • {sub.daysOverdue} day{sub.daysOverdue !== 1 ? 's' : ''} overdue
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Today's Activity Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

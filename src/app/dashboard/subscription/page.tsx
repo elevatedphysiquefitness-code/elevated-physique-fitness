@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { CreditCard, Calendar, CheckCircle, AlertCircle, Receipt, Download } from 'lucide-react';
+import { CreditCard, Calendar, CheckCircle, AlertCircle, Receipt, Download, Clock } from 'lucide-react';
 import Button from '@/components/ui/Button';
 
 interface Subscription {
@@ -46,7 +46,7 @@ export default function SubscriptionPage() {
         .from('subscriptions')
         .select('*')
         .or(`client_id.eq.${user.id},user_id.eq.${user.id}`)
-        .eq('status', 'active')
+        .in('status', ['active', 'past_due'])
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -99,6 +99,17 @@ export default function SubscriptionPage() {
     });
   };
 
+  const getDaysUntilDue = () => {
+    if (!subscription?.next_billing_date) return null;
+    const due = new Date(subscription.next_billing_date + 'T00:00:00');
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const daysUntilDue = getDaysUntilDue();
+  const isPastDue = subscription?.status === 'past_due' || (daysUntilDue !== null && daysUntilDue < 0);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -117,6 +128,23 @@ export default function SubscriptionPage() {
 
       {subscription ? (
         <>
+          {/* Past Due Alert */}
+          {isPastDue && (
+            <div className="bg-red-50 border border-red-200 p-4 flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-red-800">Payment Past Due</p>
+                <p className="text-sm text-red-700 mt-1">
+                  Your payment was due on {formatDate(subscription.next_billing_date)}.
+                  Please update your payment method to avoid interruption to your coaching services.
+                </p>
+                <Button href="/dashboard/messages" variant="primary" className="mt-3 !bg-red-600 !hover:bg-red-700">
+                  Contact Coach
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Current Plan */}
           <div className="bg-white p-6">
             <div className="flex items-start justify-between">
@@ -125,9 +153,15 @@ export default function SubscriptionPage() {
                 <h2 className="text-2xl font-bold text-black mt-1">{subscription.plan_name}</h2>
                 <p className="text-grey-600 mt-1 capitalize">{subscription.plan_type} Coaching</p>
               </div>
-              <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700">
-                <CheckCircle className="h-4 w-4" />
-                <span className="text-sm font-medium capitalize">{subscription.status}</span>
+              <div className={`flex items-center gap-2 px-3 py-1 ${
+                isPastDue
+                  ? 'bg-red-100 text-red-700'
+                  : 'bg-green-100 text-green-700'
+              }`}>
+                {isPastDue ? <AlertCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                <span className="text-sm font-medium capitalize">
+                  {isPastDue ? 'Past Due' : subscription.status}
+                </span>
               </div>
             </div>
 
@@ -155,12 +189,34 @@ export default function SubscriptionPage() {
               </div>
 
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-orange-100 flex items-center justify-center">
-                  <Calendar className="h-5 w-5 text-orange-600" />
+                <div className={`w-10 h-10 flex items-center justify-center ${
+                  isPastDue ? 'bg-red-100' : daysUntilDue !== null && daysUntilDue <= 3 ? 'bg-yellow-100' : 'bg-orange-100'
+                }`}>
+                  {isPastDue ? (
+                    <AlertCircle className="h-5 w-5 text-red-600" />
+                  ) : (
+                    <Calendar className={`h-5 w-5 ${daysUntilDue !== null && daysUntilDue <= 3 ? 'text-yellow-600' : 'text-orange-600'}`} />
+                  )}
                 </div>
                 <div>
                   <p className="text-sm text-grey-500">Next Billing</p>
                   <p className="font-semibold text-black">{formatDate(subscription.next_billing_date)}</p>
+                  {daysUntilDue !== null && (
+                    <p className={`text-xs font-medium mt-0.5 ${
+                      isPastDue ? 'text-red-600' :
+                      daysUntilDue <= 3 ? 'text-yellow-600' :
+                      'text-grey-500'
+                    }`}>
+                      {isPastDue
+                        ? `${Math.abs(daysUntilDue)} day${Math.abs(daysUntilDue) !== 1 ? 's' : ''} overdue`
+                        : daysUntilDue === 0
+                        ? 'Due today'
+                        : daysUntilDue === 1
+                        ? 'Due tomorrow'
+                        : `Due in ${daysUntilDue} days`
+                      }
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

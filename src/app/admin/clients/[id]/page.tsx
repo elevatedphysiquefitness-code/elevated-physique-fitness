@@ -1306,7 +1306,7 @@ export default function ClientDetailPage() {
             {subscription ? (
               <>
                 <p className="font-semibold text-black">{subscription.plan_name}</p>
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-2 text-sm flex-wrap">
                   <span className={`px-2 py-0.5 text-xs font-medium ${
                     subscription.status === 'active'
                       ? 'bg-green-100 text-green-700'
@@ -1314,7 +1314,7 @@ export default function ClientDetailPage() {
                       ? 'bg-yellow-100 text-yellow-700'
                       : 'bg-red-100 text-red-700'
                   }`}>
-                    {subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
+                    {subscription.status === 'past_due' ? 'Past Due' : subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
                   </span>
                   <span className="text-grey-500">•</span>
                   <span className="text-grey-600 capitalize">{subscription.billing_interval}</span>
@@ -1331,11 +1331,23 @@ export default function ClientDetailPage() {
                     </>
                   )}
                 </div>
-                {subscription.next_billing_date && (
-                  <p className="text-xs text-grey-500 mt-1">
-                    Next billing: {new Date(subscription.next_billing_date).toLocaleDateString()}
-                  </p>
-                )}
+                {subscription.next_billing_date && (() => {
+                  const due = new Date(subscription.next_billing_date + 'T00:00:00');
+                  const now = new Date();
+                  now.setHours(0, 0, 0, 0);
+                  const daysUntil = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                  const isOverdue = daysUntil < 0 || subscription.status === 'past_due';
+                  return (
+                    <p className={`text-xs mt-1 ${isOverdue ? 'text-red-600 font-medium' : 'text-grey-500'}`}>
+                      Next billing: {due.toLocaleDateString()}
+                      {isOverdue
+                        ? ` (${Math.abs(daysUntil)} day${Math.abs(daysUntil) !== 1 ? 's' : ''} overdue)`
+                        : daysUntil <= 3
+                        ? ` (in ${daysUntil} day${daysUntil !== 1 ? 's' : ''})`
+                        : ''}
+                    </p>
+                  );
+                })()}
               </>
             ) : (
               <>
