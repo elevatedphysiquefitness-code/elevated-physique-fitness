@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { CreditCard, Calendar, CheckCircle, AlertCircle, Receipt, Download, Clock } from 'lucide-react';
+import { CreditCard, Calendar, CheckCircle, AlertCircle, Receipt, Download, Clock, ExternalLink } from 'lucide-react';
 import Button from '@/components/ui/Button';
 
 interface Subscription {
@@ -31,6 +31,7 @@ export default function SubscriptionPage() {
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingPayments, setLoadingPayments] = useState(false);
+  const [loadingPortal, setLoadingPortal] = useState(false);
 
   useEffect(() => {
     fetchSubscription();
@@ -105,6 +106,22 @@ export default function SubscriptionPage() {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     return Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const openBillingPortal = async () => {
+    setLoadingPortal(true);
+    try {
+      const response = await fetch('/api/stripe/portal', { method: 'POST' });
+      const data = await response.json();
+      if (response.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.error || 'Unable to open payment portal. Please contact your coach.');
+      }
+    } catch {
+      alert('Something went wrong. Please try again.');
+    }
+    setLoadingPortal(false);
   };
 
   const daysUntilDue = getDaysUntilDue();
@@ -251,6 +268,17 @@ export default function SubscriptionPage() {
               Need to make changes to your subscription? Contact your coach to discuss options.
             </p>
             <div className="flex flex-wrap gap-3">
+              {subscription.stripe_customer_id && (
+                <button
+                  onClick={openBillingPortal}
+                  disabled={loadingPortal}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#3D2314] text-white font-medium hover:bg-[#2a1810] disabled:opacity-50 transition-colors"
+                >
+                  <CreditCard className="h-4 w-4" />
+                  {loadingPortal ? 'Opening...' : 'Manage Payment Method'}
+                  {!loadingPortal && <ExternalLink className="h-3.5 w-3.5" />}
+                </button>
+              )}
               <Button href="/dashboard/messages" variant="outline">
                 Contact Coach
               </Button>
@@ -258,6 +286,11 @@ export default function SubscriptionPage() {
                 View Other Plans
               </Button>
             </div>
+            {!subscription.stripe_customer_id && (
+              <p className="text-sm text-grey-500 mt-3">
+                To update your payment method, please contact your coach directly.
+              </p>
+            )}
           </div>
         </>
       ) : (
