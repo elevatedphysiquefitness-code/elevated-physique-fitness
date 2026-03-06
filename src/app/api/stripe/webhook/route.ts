@@ -43,10 +43,35 @@ export async function POST(request: Request) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
+        const metadata = session.metadata;
 
-        if (session.mode === 'subscription' && session.subscription) {
-          const metadata = session.metadata;
+        if (session.mode === 'payment' && metadata?.type === 'past_due_payment') {
+          // Handle past due payment - reactivate subscription and advance billing date
+          const subscriptionId = metadata.subscription_id;
+          if (subscriptionId) {
+            const { data: existingSub } = await supabase
+              .from('subscriptions')
+              .select('billing_cycle, billing_interval, billing_day_1, billing_day_2')
+              .eq('id', subscriptionId)
+              .single();
 
+            if (existingSub) {
+              const { getNextBillingDate } = await import('@/lib/billing');
+              const interval = existingSub.billing_interval || existingSub.billing_cycle || 'monthly';
+              const nextDate = getNextBillingDate(interval, new Date(), existingSub.billing_day_1, existingSub.billing_day_2);
+
+              await supabase
+                .from('subscriptions')
+                .update({
+                  status: 'active',
+                  next_billing_date: nextDate,
+                  stripe_customer_id: session.customer as string || undefined,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', subscriptionId);
+            }
+          }
+        } else if (session.mode === 'subscription' && session.subscription) {
           if (metadata?.userId) {
             // Calculate next billing date based on interval
             const startDate = new Date();

@@ -32,8 +32,17 @@ export default function SubscriptionPage() {
   const [loading, setLoading] = useState(true);
   const [loadingPayments, setLoadingPayments] = useState(false);
   const [loadingPortal, setLoadingPortal] = useState(false);
+  const [loadingPayNow, setLoadingPayNow] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   useEffect(() => {
+    // Check for payment success redirect
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment') === 'success') {
+      setPaymentSuccess(true);
+      // Clean up URL
+      window.history.replaceState({}, '', '/dashboard/subscription');
+    }
     fetchSubscription();
   }, []);
 
@@ -108,6 +117,22 @@ export default function SubscriptionPage() {
     return Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   };
 
+  const payNow = async () => {
+    setLoadingPayNow(true);
+    try {
+      const response = await fetch('/api/stripe/pay-now', { method: 'POST' });
+      const data = await response.json();
+      if (response.ok && data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.error || 'Unable to process payment. Please contact your coach.');
+      }
+    } catch {
+      alert('Something went wrong. Please try again.');
+    }
+    setLoadingPayNow(false);
+  };
+
   const openBillingPortal = async () => {
     setLoadingPortal(true);
     try {
@@ -143,21 +168,44 @@ export default function SubscriptionPage() {
         <p className="text-grey-600 mt-1">Manage your membership and billing</p>
       </div>
 
+      {/* Payment Success Banner */}
+      {paymentSuccess && (
+        <div className="bg-green-50 border border-green-200 p-4 flex items-start gap-3">
+          <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-green-800">Payment Successful!</p>
+            <p className="text-sm text-green-700 mt-1">
+              Your payment has been received. Your subscription is now up to date.
+            </p>
+          </div>
+        </div>
+      )}
+
       {subscription ? (
         <>
           {/* Past Due Alert */}
-          {isPastDue && (
+          {isPastDue && !paymentSuccess && (
             <div className="bg-red-50 border border-red-200 p-4 flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-red-800">Payment Past Due</p>
                 <p className="text-sm text-red-700 mt-1">
-                  Your payment was due on {formatDate(subscription.next_billing_date)}.
-                  Please update your payment method to avoid interruption to your coaching services.
+                  Your payment of ${subscription.price} was due on {formatDate(subscription.next_billing_date)}.
+                  Please make your payment to avoid interruption to your coaching services.
                 </p>
-                <Button href="/dashboard/messages" variant="primary" className="mt-3 !bg-red-600 !hover:bg-red-700">
-                  Contact Coach
-                </Button>
+                <div className="flex flex-wrap gap-3 mt-3">
+                  <button
+                    onClick={payNow}
+                    disabled={loadingPayNow}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-50 transition-colors"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    {loadingPayNow ? 'Processing...' : `Pay $${subscription.price} Now`}
+                  </button>
+                  <Button href="/dashboard/messages" variant="outline">
+                    Message Coach
+                  </Button>
+                </div>
               </div>
             </div>
           )}
