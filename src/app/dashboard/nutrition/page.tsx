@@ -34,6 +34,8 @@ import {
   ScanBarcode,
   Camera,
   Wand2,
+  Star,
+  Copy,
 } from 'lucide-react';
 
 interface ClientData {
@@ -77,6 +79,20 @@ interface FoodLog {
   meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'pre_workout' | 'post_workout' | 'other' | null;
   notes: string | null;
   logged_at: string;
+}
+
+interface SavedFood {
+  id: string;
+  client_id: string;
+  food_name: string;
+  serving_size: string | null;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  is_favorite: boolean;
+  use_count: number;
+  last_used_at: string;
 }
 
 interface FoodSearchResult {
@@ -294,6 +310,7 @@ export default function NutritionPage() {
   const [showFoodModal, setShowFoodModal] = useState(false);
   const [editingFood, setEditingFood] = useState<FoodLog | null>(null);
   const [savingFood, setSavingFood] = useState(false);
+  const [savedFoods, setSavedFoods] = useState<SavedFood[]>([]);
   const [newFood, setNewFood] = useState({
     food_name: '',
     servings: '1',
@@ -305,6 +322,17 @@ export default function NutritionPage() {
     meal_type: 'lunch' as 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'pre_workout' | 'post_workout' | 'other',
     notes: '',
   });
+  const [foodQueue, setFoodQueue] = useState<Array<{
+    food_name: string;
+    servings: number;
+    serving_size: string | null;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'pre_workout' | 'post_workout' | 'other';
+    notes: string | null;
+  }>>([]);
 
   // AI Nutrition Tips state
   const [nutritionTips, setNutritionTips] = useState<{ title: string; tip: string; actionStep: string }[]>([]);
@@ -449,8 +477,9 @@ export default function NutritionPage() {
       setMacros(calculatedMacros);
     }
 
-    // Fetch today's food logs
+    // Fetch today's food logs and saved favorites
     await fetchFoodLogs(user.id, today);
+    await fetchSavedFoods(user.id);
 
     setLoading(false);
   };
@@ -470,6 +499,17 @@ export default function NutritionPage() {
     if (error) {
       console.error('Error fetching food logs:', error);
     }
+  };
+
+  const fetchSavedFoods = async (clientId: string) => {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('saved_foods')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('is_favorite', true)
+      .order('use_count', { ascending: false });
+    if (data) setSavedFoods(data);
   };
 
   const fetchHistoryLogs = async (clientId: string, range: 'week' | 'month' | 'all') => {
@@ -871,11 +911,29 @@ export default function NutritionPage() {
     setFoodEntryMode('manual'); // Switch to manual mode to show all fields
   };
 
+  const selectFavoriteFood = async (food: SavedFood) => {
+    setNewFood({
+      ...newFood,
+      food_name: food.food_name,
+      serving_size: food.serving_size || '',
+      calories: food.calories.toString(),
+      protein: food.protein.toString(),
+      carbs: food.carbs.toString(),
+      fat: food.fat.toString(),
+    });
+    setSearchQuery(food.food_name);
+    setFoodEntryMode('manual');
+    // Increment use count in background
+    const supabase = createClient();
+    supabase.from('saved_foods').update({ use_count: food.use_count + 1, last_used_at: new Date().toISOString() }).eq('id', food.id);
+  };
+
   const openAddFoodModal = () => {
     resetFoodForm();
     setSearchQuery('');
     setSearchResults([]);
     setShowSearchResults(false);
+    if (userId) fetchSavedFoods(userId);
     setShowFoodModal(true);
   };
 
@@ -899,13 +957,45 @@ export default function NutritionPage() {
     setShowFoodModal(true);
   };
 
+  const handleAddToQueue = () => {
+    if (!newFood.food_name || !newFood.calories) return;
+    setFoodQueue(prev => [...prev, {
+      food_name: newFood.food_name,
+      servings: parseFloat(newFood.servings) || 1,
+      serving_size: newFood.serving_size || null,
+      calories: parseInt(newFood.calories) || 0,
+      protein: parseFloat(newFood.protein) || 0,
+      carbs: parseFloat(newFood.carbs) || 0,
+      fat: parseFloat(newFood.fat) || 0,
+      meal_type: newFood.meal_type,
+      notes: newFood.notes || null,
+    }]);
+    setNewFood({
+      food_name: '',
+      servings: '1',
+      serving_size: '',
+      calories: '',
+      protein: '',
+      carbs: '',
+      fat: '',
+      meal_type: newFood.meal_type,
+      notes: '',
+    });
+    setSearchQuery('');
+    setSearchResults([]);
+    setShowSearchResults(false);
+    setFoodEntryMode('search');
+    setScanError(null);
+    stopScanner();
+  };
+
   const handleSaveFood = async () => {
-    if (!userId || !newFood.food_name || !newFood.calories) return;
+    if (!userId) return;
 
     setSavingFood(true);
     const supabase = createClient();
 
-    const foodData = {
+    const currentFoodData = newFood.food_name && newFood.calories ? {
       client_id: userId,
       log_date: selectedDate,
       food_name: newFood.food_name,
@@ -917,13 +1007,13 @@ export default function NutritionPage() {
       fat: parseFloat(newFood.fat) || 0,
       meal_type: newFood.meal_type,
       notes: newFood.notes || null,
-    };
+    } : null;
 
-    if (editingFood) {
+    if (editingFood && currentFoodData) {
       // Update existing food log
       const { error } = await supabase
         .from('food_logs')
-        .update(foodData)
+        .update(currentFoodData)
         .eq('id', editingFood.id);
 
       if (error) {
@@ -932,14 +1022,27 @@ export default function NutritionPage() {
       } else {
         await fetchFoodLogs(userId, selectedDate);
         setShowFoodModal(false);
+        setFoodQueue([]);
         resetFoodForm();
         toast.success('Food updated!');
       }
     } else {
-      // Insert new food log
+      // Build all items to insert: queued items + current form item (if filled)
+      const queuedItems = foodQueue.map(item => ({
+        client_id: userId,
+        log_date: selectedDate,
+        ...item,
+      }));
+      const allItems = currentFoodData ? [...queuedItems, currentFoodData] : queuedItems;
+
+      if (allItems.length === 0) {
+        setSavingFood(false);
+        return;
+      }
+
       const { error } = await supabase
         .from('food_logs')
-        .insert(foodData);
+        .insert(allItems);
 
       if (error) {
         console.error('Error adding food log:', error);
@@ -947,8 +1050,9 @@ export default function NutritionPage() {
       } else {
         await fetchFoodLogs(userId, selectedDate);
         setShowFoodModal(false);
+        setFoodQueue([]);
         resetFoodForm();
-        toast.success('Food logged!');
+        toast.success(allItems.length > 1 ? `${allItems.length} items logged!` : 'Food logged!');
       }
     }
 
@@ -976,6 +1080,63 @@ export default function NutritionPage() {
     }
   };
 
+  const toggleFavorite = async (food: FoodLog) => {
+    if (!userId) return;
+    const supabase = createClient();
+
+    const { data: existing } = await supabase
+      .from('saved_foods')
+      .select('id, is_favorite')
+      .eq('client_id', userId)
+      .eq('food_name', food.food_name)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase
+        .from('saved_foods')
+        .update({ is_favorite: !existing.is_favorite, last_used_at: new Date().toISOString() })
+        .eq('id', existing.id);
+      toast.success(existing.is_favorite ? 'Removed from favorites' : 'Added to favorites!');
+    } else {
+      await supabase.from('saved_foods').insert({
+        client_id: userId,
+        food_name: food.food_name,
+        serving_size: food.serving_size,
+        calories: food.calories,
+        protein: food.protein,
+        carbs: food.carbs,
+        fat: food.fat,
+        is_favorite: true,
+      });
+      toast.success('Added to favorites!');
+    }
+    await fetchSavedFoods(userId);
+  };
+
+  const handleDuplicateFood = async (food: FoodLog) => {
+    if (!userId) return;
+    const supabase = createClient();
+    const { error } = await supabase.from('food_logs').insert({
+      client_id: userId,
+      log_date: selectedDate,
+      food_name: food.food_name,
+      servings: food.servings,
+      serving_size: food.serving_size,
+      calories: food.calories,
+      protein: food.protein,
+      carbs: food.carbs,
+      fat: food.fat,
+      meal_type: food.meal_type,
+      notes: food.notes,
+    });
+    if (error) {
+      toast.error('Failed to duplicate food');
+    } else {
+      await fetchFoodLogs(userId, selectedDate);
+      toast.success(`${food.food_name} duplicated!`);
+    }
+  };
+
   // Group food logs by meal type
   const groupedFoodLogs = foodLogs.reduce((acc, log) => {
     const mealType = log.meal_type || 'other';
@@ -983,6 +1144,8 @@ export default function NutritionPage() {
     acc[mealType].push(log);
     return acc;
   }, {} as Record<string, FoodLog[]>);
+
+  const favoriteNames = new Set(savedFoods.filter(f => f.is_favorite).map(f => f.food_name));
 
   const mealTypeOrder = ['breakfast', 'lunch', 'dinner', 'snack', 'pre_workout', 'post_workout', 'other'];
 
@@ -1324,6 +1487,24 @@ export default function NutritionPage() {
                               <span className="font-semibold text-black text-sm sm:text-base">{food.calories} cal</span>
                               <div className="flex gap-1">
                                 <button
+                                  onClick={() => toggleFavorite(food)}
+                                  className={`p-2 rounded-lg transition-colors ${
+                                    favoriteNames.has(food.food_name)
+                                      ? 'text-yellow-500 hover:text-yellow-600 hover:bg-yellow-50'
+                                      : 'text-grey-400 hover:text-yellow-500 hover:bg-yellow-50'
+                                  }`}
+                                  title={favoriteNames.has(food.food_name) ? 'Remove from favorites' : 'Save as favorite'}
+                                >
+                                  <Star className="h-4 w-4" fill={favoriteNames.has(food.food_name) ? 'currentColor' : 'none'} />
+                                </button>
+                                <button
+                                  onClick={() => handleDuplicateFood(food)}
+                                  className="p-2 text-grey-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                  title="Duplicate"
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </button>
+                                <button
                                   onClick={() => openEditFoodModal(food)}
                                   className="p-2 text-grey-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                   title="Edit"
@@ -1449,6 +1630,13 @@ export default function NutritionPage() {
                                       </p>
                                     </div>
                                     <div className="flex gap-1">
+                                      <button
+                                        onClick={() => handleDuplicateFood(log)}
+                                        className="p-1.5 text-grey-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                                        title="Add to today's log"
+                                      >
+                                        <Copy className="h-3.5 w-3.5" />
+                                      </button>
                                       <button
                                         onClick={() => {
                                           setSelectedDate(log.log_date);
@@ -1993,6 +2181,7 @@ export default function NutritionPage() {
                 <button
                   onClick={() => {
                     setShowFoodModal(false);
+                    setFoodQueue([]);
                     resetFoodForm();
                   }}
                   className="text-grey-400 hover:text-black"
@@ -2130,6 +2319,30 @@ export default function NutritionPage() {
                       </button>
                       .
                     </p>
+                  </div>
+                )}
+
+                {/* Favorites (shown in search mode when favorites exist) */}
+                {foodEntryMode === 'search' && !editingFood && savedFoods.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-grey-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                      <Star className="h-3 w-3 text-yellow-500" fill="currentColor" />
+                      My Favorites
+                    </p>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {savedFoods.map((food) => (
+                        <button
+                          key={food.id}
+                          type="button"
+                          onClick={() => selectFavoriteFood(food)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 border border-yellow-200 text-sm text-yellow-800 hover:bg-yellow-100 transition-colors rounded-lg"
+                        >
+                          <span className="font-medium truncate max-w-[140px]">{food.food_name}</span>
+                          <span className="text-yellow-600 text-xs flex-shrink-0">{food.calories} cal</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="border-t border-grey-100 mb-3" />
                   </div>
                 )}
 
@@ -2442,10 +2655,35 @@ export default function NutritionPage() {
                 )}
               </div>
 
+              {/* Queued items list */}
+              {!editingFood && foodQueue.length > 0 && (
+                <div className="mt-4 border border-grey-200 rounded-lg overflow-hidden">
+                  <div className="bg-grey-50 px-4 py-2 text-xs font-semibold text-grey-600 uppercase tracking-wide">
+                    Items to log ({foodQueue.length})
+                  </div>
+                  <ul className="divide-y divide-grey-100">
+                    {foodQueue.map((item, idx) => (
+                      <li key={idx} className="flex items-center justify-between px-4 py-2 text-sm">
+                        <span className="font-medium text-black truncate max-w-[60%]">{item.food_name}</span>
+                        <span className="text-grey-500 mr-3">{item.calories} cal</span>
+                        <button
+                          type="button"
+                          onClick={() => setFoodQueue(prev => prev.filter((_, i) => i !== idx))}
+                          className="text-grey-400 hover:text-red-500"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <div className="mt-6 flex gap-3">
                 <Button
                   onClick={() => {
                     setShowFoodModal(false);
+                    setFoodQueue([]);
                     resetFoodForm();
                   }}
                   variant="outline"
@@ -2453,13 +2691,23 @@ export default function NutritionPage() {
                 >
                   Cancel
                 </Button>
+                {!editingFood && (
+                  <Button
+                    onClick={handleAddToQueue}
+                    variant="outline"
+                    className="flex-1"
+                    disabled={!newFood.food_name || !newFood.calories}
+                  >
+                    + Add Another
+                  </Button>
+                )}
                 <Button
                   onClick={handleSaveFood}
                   variant="primary"
                   className="flex-1"
-                  disabled={!newFood.food_name || !newFood.calories || savingFood}
+                  disabled={(!newFood.food_name && foodQueue.length === 0) || (!newFood.calories && foodQueue.length === 0) || savingFood}
                 >
-                  {savingFood ? 'Saving...' : editingFood ? 'Update' : 'Log Food'}
+                  {savingFood ? 'Saving...' : editingFood ? 'Update' : foodQueue.length > 0 ? `Log All (${foodQueue.length + (newFood.food_name && newFood.calories ? 1 : 0)})` : 'Log Food'}
                 </Button>
               </div>
             </div>
