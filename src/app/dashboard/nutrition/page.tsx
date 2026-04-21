@@ -2174,9 +2174,9 @@ export default function NutritionPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-black">
-                  {editingFood ? 'Edit Food Entry' : 'Log Food'}
+                  {editingFood ? 'Edit Food Entry' : foodQueue.length > 0 ? `Log Foods (${foodQueue.length} queued)` : 'Log Food'}
                 </h3>
                 <button
                   onClick={() => {
@@ -2189,6 +2189,38 @@ export default function NutritionPage() {
                   <X className="h-6 w-6" />
                 </button>
               </div>
+
+              {/* Queue — shown at top so user sees the list they're building */}
+              {!editingFood && foodQueue.length > 0 && (
+                <div className="mb-4 border border-grey-200 rounded-lg overflow-hidden">
+                  <div className="bg-grey-50 px-4 py-2 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-grey-600 uppercase tracking-wide">
+                      Items to log ({foodQueue.length})
+                    </span>
+                    <span className="text-xs text-grey-500">
+                      {foodQueue.reduce((sum, i) => sum + i.calories, 0)} cal &bull;{' '}
+                      {foodQueue.reduce((sum, i) => sum + i.protein, 0).toFixed(0)}g P &bull;{' '}
+                      {foodQueue.reduce((sum, i) => sum + i.carbs, 0).toFixed(0)}g C &bull;{' '}
+                      {foodQueue.reduce((sum, i) => sum + i.fat, 0).toFixed(0)}g F
+                    </span>
+                  </div>
+                  <ul className="divide-y divide-grey-100">
+                    {foodQueue.map((item, idx) => (
+                      <li key={idx} className="flex items-center justify-between px-4 py-2 text-sm">
+                        <span className="font-medium text-black truncate max-w-[55%]">{item.food_name}</span>
+                        <span className="text-grey-500 text-xs mr-2">{item.calories} cal &bull; {item.protein}g P</span>
+                        <button
+                          type="button"
+                          onClick={() => setFoodQueue(prev => prev.filter((_, i) => i !== idx))}
+                          className="text-grey-400 hover:text-red-500 flex-shrink-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               <div className="space-y-4">
                 {/* Mode Toggle */}
@@ -2655,60 +2687,38 @@ export default function NutritionPage() {
                 )}
               </div>
 
-              {/* Queued items list */}
-              {!editingFood && foodQueue.length > 0 && (
-                <div className="mt-4 border border-grey-200 rounded-lg overflow-hidden">
-                  <div className="bg-grey-50 px-4 py-2 text-xs font-semibold text-grey-600 uppercase tracking-wide">
-                    Items to log ({foodQueue.length})
-                  </div>
-                  <ul className="divide-y divide-grey-100">
-                    {foodQueue.map((item, idx) => (
-                      <li key={idx} className="flex items-center justify-between px-4 py-2 text-sm">
-                        <span className="font-medium text-black truncate max-w-[60%]">{item.food_name}</span>
-                        <span className="text-grey-500 mr-3">{item.calories} cal</span>
-                        <button
-                          type="button"
-                          onClick={() => setFoodQueue(prev => prev.filter((_, i) => i !== idx))}
-                          className="text-grey-400 hover:text-red-500"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <div className="mt-6 flex gap-3">
-                <Button
-                  onClick={() => {
-                    setShowFoodModal(false);
-                    setFoodQueue([]);
-                    resetFoodForm();
-                  }}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
+              <div className="mt-6 space-y-2">
                 {!editingFood && (
                   <Button
                     onClick={handleAddToQueue}
                     variant="outline"
-                    className="flex-1"
+                    className="w-full"
                     disabled={!newFood.food_name || !newFood.calories}
                   >
-                    + Add Another
+                    + Queue Item &amp; Add Another
                   </Button>
                 )}
-                <Button
-                  onClick={handleSaveFood}
-                  variant="primary"
-                  className="flex-1"
-                  disabled={(!newFood.food_name && foodQueue.length === 0) || (!newFood.calories && foodQueue.length === 0) || savingFood}
-                >
-                  {savingFood ? 'Saving...' : editingFood ? 'Update' : foodQueue.length > 0 ? `Log All (${foodQueue.length + (newFood.food_name && newFood.calories ? 1 : 0)})` : 'Log Food'}
-                </Button>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() => {
+                      setShowFoodModal(false);
+                      setFoodQueue([]);
+                      resetFoodForm();
+                    }}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSaveFood}
+                    variant="primary"
+                    className="flex-1"
+                    disabled={(!newFood.food_name && foodQueue.length === 0) || (!newFood.calories && foodQueue.length === 0) || savingFood}
+                  >
+                    {savingFood ? 'Saving...' : editingFood ? 'Update' : foodQueue.length > 0 ? `Log All (${foodQueue.length + (newFood.food_name && newFood.calories ? 1 : 0)})` : 'Log Food'}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
