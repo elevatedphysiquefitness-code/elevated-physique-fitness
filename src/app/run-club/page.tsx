@@ -79,7 +79,7 @@ export default function RunClubPage() {
               committed to showing up and putting in the miles together.
             </p>
             <div className="mt-10 flex flex-col sm:flex-row gap-4">
-              <Button href="/contact" size="lg">
+              <Button href="/run-club/sign-up" size="lg">
                 Join the Run Club
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
@@ -148,7 +148,7 @@ export default function RunClubPage() {
                 your base the right way, not just grinding miles.
               </p>
               <div className="mt-10">
-                <Button href="/contact">
+                <Button href="/run-club/sign-up">
                   Sign Up to Join
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -283,7 +283,7 @@ export default function RunClubPage() {
           </p>
           <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
             <Button
-              href="/contact"
+              href="/run-club/sign-up"
               size="lg"
               className="bg-white text-brown-700 hover:bg-brown-100"
             >
