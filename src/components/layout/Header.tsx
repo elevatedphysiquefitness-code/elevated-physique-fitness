@@ -8,15 +8,22 @@ import { Menu, X, ChevronDown } from 'lucide-react';
 const navigation = [
   { name: 'Home', href: '/' },
   { name: 'About', href: '/about' },
-  { name: 'Services', href: '/services' },
   { name: 'Pricing', href: '/pricing' },
   { name: 'Policies', href: '/policies' },
   { name: 'FAQ', href: '/faq' },
   { name: 'Contact', href: '/contact' },
 ];
 
+const servicesDropdown = [
+  { name: '1-on-1 Personal Training', href: '/services' },
+  { name: 'Online Coaching', href: '/services#online' },
+  { name: 'Group Fitness', href: '/group-fitness' },
+  { name: 'Run Club', href: '/run-club' },
+];
+
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [servicesOpen, setServicesOpen] = useState(false);
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-[#AB875F] border-b border-[#8B6D4A]">
@@ -36,7 +43,43 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <div className="hidden lg:flex lg:items-center lg:space-x-8">
-            {navigation.map((item) => (
+            {navigation.slice(0, 2).map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                className="text-sm font-medium text-grey-700 hover:text-blue-600 transition-colors duration-200"
+              >
+                {item.name}
+              </Link>
+            ))}
+
+            {/* Services Dropdown */}
+            <div
+              className="relative"
+              onMouseEnter={() => setServicesOpen(true)}
+              onMouseLeave={() => setServicesOpen(false)}
+            >
+              <button className="flex items-center gap-1 text-sm font-medium text-grey-700 hover:text-blue-600 transition-colors duration-200">
+                Services
+                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${servicesOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {servicesOpen && (
+                <div className="absolute top-full left-0 mt-1 w-52 bg-white shadow-lg border border-grey-100 z-50">
+                  {servicesDropdown.map((item) => (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className="block px-4 py-3 text-sm text-grey-700 hover:bg-[#EBE4D6] hover:text-brown-900 transition-colors"
+                      onClick={() => setServicesOpen(false)}
+                    >
+                      {item.name}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {navigation.slice(2).map((item) => (
               <Link
                 key={item.name}
                 href={item.href}
@@ -81,7 +124,33 @@ export default function Header() {
         {mobileMenuOpen && (
           <div className="lg:hidden py-4 border-t border-grey-200">
             <div className="flex flex-col space-y-4">
-              {navigation.map((item) => (
+              {navigation.slice(0, 2).map((item) => (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className="text-base font-medium text-grey-700 hover:text-blue-600 transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  {item.name}
+                </Link>
+              ))}
+              {/* Services group */}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-grey-400 mb-2">
+                  Services
+                </p>
+                {servicesDropdown.map((item) => (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className="block pl-3 py-1.5 text-base font-medium text-grey-700 hover:text-blue-600 transition-colors"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    {item.name}
+                  </Link>
+                ))}
+              </div>
+              {navigation.slice(2).map((item) => (
                 <Link
                   key={item.name}
                   href={item.href}

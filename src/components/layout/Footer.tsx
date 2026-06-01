@@ -3,9 +3,11 @@ import { Instagram, Youtube, Mail, MapPin, Facebook, Linkedin } from 'lucide-rea
 
 const footerLinks = {
   services: [
-    { name: 'Services', href: '/services' },
+    { name: 'Personal Training', href: '/services' },
+    { name: 'Online Coaching', href: '/services#online' },
+    { name: 'Group Fitness', href: '/group-fitness' },
+    { name: 'Run Club', href: '/run-club' },
     { name: 'Pricing', href: '/pricing' },
-    { name: 'Membership Benefits', href: '/membership' },
     { name: 'Apply for Coaching', href: '/apply' },
   ],
   company: [

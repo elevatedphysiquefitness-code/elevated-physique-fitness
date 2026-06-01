@@ -1,11 +1,11 @@
 import { Metadata } from 'next';
 import Button from '@/components/ui/Button';
-import { Users, Laptop, ArrowRight, Check } from 'lucide-react';
+import { Users, Laptop, Zap, Footprints, ArrowRight, Check } from 'lucide-react';
 import AdminImageUpload from '@/components/admin/AdminImageUpload';
 
 export const metadata: Metadata = {
   title: 'Services | Elevated Physique Fitness',
-  description: '1-on-1 personal training and online coaching designed to transform your physique and build lasting discipline.',
+  description: '1-on-1 personal training, online coaching, group fitness classes, and run club — all in Houston.',
 };
 
 const services = [
@@ -44,6 +44,42 @@ const services = [
     ],
     cta: 'View Online Pricing',
     href: '/pricing#online',
+  },
+  {
+    icon: Zap,
+    title: 'Group Fitness',
+    imageKey: 'services-group',
+    defaultImage: 'https://images.unsplash.com/photo-1549060279-7e168fcee0c2?w=800&q=80',
+    description: 'Coach-led group classes in Houston — Bootcamp, Strength & Conditioning, HIIT, and Core & Mobility. All fitness levels welcome.',
+    features: [
+      'Four class formats to choose from',
+      'Small class sizes for personal attention',
+      'Structured monthly programming',
+      'Drop-in, class pack, or monthly membership options',
+      'All equipment provided',
+      'Modifications available for every level',
+      'Community of motivated members',
+    ],
+    cta: 'View Group Fitness',
+    href: '/group-fitness',
+  },
+  {
+    icon: Footprints,
+    title: 'Run Club',
+    imageKey: 'services-runclub',
+    defaultImage: 'https://images.unsplash.com/photo-1571008887538-b36bb32f4571?w=800&q=80',
+    description: 'Weekly Saturday group runs in Houston open to all paces. Coach-led, community-driven, and completely beginner-friendly.',
+    features: [
+      'Every Saturday at 7:00 AM',
+      'Rotating Houston routes',
+      'Coach-led warm-up, run, and cool-down',
+      'Pace groups for all fitness levels',
+      'Free for current Elevated Physique members',
+      'Monthly challenges and milestone recognition',
+      'Post-run community meetup',
+    ],
+    cta: 'Learn About Run Club',
+    href: '/run-club',
   },
 ];
 
